@@ -3,7 +3,7 @@ var router = express.Router()
 
 // Load external dependencies
 require('cookie-session')
-var CentralAuthenticationService = require('cas')
+var CentralAuthenticationService = require('../cas/index');
 
 // Load internal modules
 var config = require('./config.js')
@@ -13,7 +13,8 @@ var UserModel = require.main.require('./models/user.js')
 var casURL = 'https://fed.princeton.edu/cas/'
 var cas = new CentralAuthenticationService({
   base_url: casURL,
-  service: config.host + '/auth/verify'
+  service: config.host + '/auth/verify',
+  version: 2.0
 })
 
 router.use('*', function (req, res, next) {
@@ -43,7 +44,7 @@ router.get('/verify', function (req, res) {
   }
 
   var ticket = req.query.ticket
-
+  console.log(ticket)
   // If the user does not have a ticket then send them to the homepage
   if (typeof (ticket) === 'undefined') {
     res.redirect('/')
@@ -53,6 +54,7 @@ router.get('/verify', function (req, res) {
   // Check if the user's ticket is valid
   cas.validate(ticket, function (err, status, netid) {
     if (err) {
+      console.log("Failed to Validate Ticket")
       console.log(err)
       res.sendStatus(500)
       return
