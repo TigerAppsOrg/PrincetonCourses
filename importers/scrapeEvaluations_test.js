@@ -48,14 +48,14 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     }
 
     console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
-    // console.log("\textra line");
-
+    console.log("\textra line");
+    console.log(data);
     // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
     // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
     //   externalCallback({}, [])
     //   return
     // }
-
+    console.log("\tsecond line");
     // Get Chart Data
     const b64EncodedChartData = $('#chart_settings').attr('value')
     const scores = {}
