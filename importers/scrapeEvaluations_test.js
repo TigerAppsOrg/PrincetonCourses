@@ -48,6 +48,7 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     }
 
     console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
+    console.log("\textra line");
 
     // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
     if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
@@ -240,7 +241,10 @@ promptly.prompt(
           thisCourse.courseID,
           function (scores, comments) {
             let promises = [];
-
+            console.log(thisCourse.semester._id);
+            console.log(thisCourse.courseID);
+            console.log(scores);
+            console.log(comments);
             // Iterate over the comments
             for (const comment of comments) {
               // Save the comments to the database
