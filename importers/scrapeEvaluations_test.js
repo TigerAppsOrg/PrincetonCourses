@@ -51,10 +51,10 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     // console.log("\textra line");
 
     // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
-      externalCallback({}, [])
-      return
-    }
+    // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
+    //   externalCallback({}, [])
+    //   return
+    // }
 
     // Get Chart Data
     const b64EncodedChartData = $('#chart_settings').attr('value')
