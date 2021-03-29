@@ -75,7 +75,9 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     $('table:last-child tr:not(:first-child) td').each(function (index, element) {
       comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
     })
-    console.log(courseID+" "+scores+" "+comments);
+    console.log(courseID);
+    console.log(scores);
+    console.log(comments);
     externalCallback(scores, comments)
   })
 }
