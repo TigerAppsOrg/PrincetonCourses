@@ -22,7 +22,8 @@ let courses
 const loadPage = function (term, courseID, callback) {
   // Define the HTTP request options
   const options = {
-    url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
+    url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
+    // url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
     headers: {
       'Cookie': `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
@@ -49,33 +50,33 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 
     console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
 
-    // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
+    // Extract scores
+    var scores = {}
+    var table_value = $(".data-bar-chart").attr('data-bar-chart')
+    if (typeof table_value === 'undefined') {
       externalCallback({}, [])
       return
     }
-
-    // Get Chart Data
-    const b64EncodedChartData = $('#chart_settings').attr('value')
-    const scores = {}
-    if (b64EncodedChartData) {
-      const chartData = Buffer.from(b64EncodedChartData, 'base64').toString('ascii')
-      const chart = JSON.parse(chartData)
-
-      // Extract Numerical Evaluation Data from Chart
-      const xItems = chart.PlotArea.XAxis.Items
-      const yItems = chart.PlotArea.ListOfSeries[0].Items
-      for (const itemIndex in chart.PlotArea.XAxis.Items) {
-        scores[xItems[itemIndex].Text] = parseFloat(yItems[itemIndex].YValue)
-      }
-    }
+    JSON.parse(table_value).forEach(function (arrayItem) {
+      scores[arrayItem['key']] = parseFloat(arrayItem['value'])
+    });
 
     // Extract student comments
     const comments = []
-    $('table:last-child tr:not(:first-child) td').each(function (index, element) {
+    var comment_values = $(".comment")
+    if (typeof comment_values === 'undefined') {
+      externalCallback({}, [])
+      return
+    }
+    comment_values.each(function(index, element) {
       comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
     })
 
+    // console.log(courseID);
+    // console.log("scores");
+    // console.log(scores);
+    // console.log("comments");
+    // console.log(comments)
     externalCallback(scores, comments)
   })
 }

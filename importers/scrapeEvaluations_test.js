@@ -1,3 +1,11 @@
+/* 
+TODO: 
+- The new place to parse is: https://registrarapps.princeton.edu/course-evaluation?courseinfo=002099&terminfo=1212
+- In dev console, go to 'Application'->'Storage'->'Cookies'->'PHPSESSID' for the new session cookie to paste
+- console.log(comments) outputs the course evaluation result NUMBERS and the term comparison NUMBERS
+- Need to parse comments
+*/
+
 // A script that uses Cheerio to scrape course evaluation information from the Registrar
 // At the moment this script does not save the data anywhere
 
