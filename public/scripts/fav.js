@@ -31,11 +31,14 @@ var updateFavList = function(courseId, course, i) {
     $('#favorite-prompt').slideUp()
   }
 
+  const currCount = parseInt($('#favs-count').text())
+
   // if newly a favorite
   if (isFav) {
     var entry = newDOMcourseResult(course, {"semester": 1, "tags": 1, 'pin': 1})
     $(entry).hide()
 
+    $('#favs-count').text(currCount+1)
     $('#favs').append(entry)
     $(entry).slideDown()
     return
@@ -47,6 +50,7 @@ var updateFavList = function(courseId, course, i) {
     if (this.courseId !== courseId) return
 
     // remove
+    $('#favs-count').text(currCount-1)
     $(this).slideUp(function() {
       this.remove()
     })

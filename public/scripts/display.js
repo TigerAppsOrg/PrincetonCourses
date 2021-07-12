@@ -112,6 +112,7 @@ var display_title = function(course) {
 
   var favCount = (
     '<strong '
+    + 'id="favs-count"'
     + 'data-toggle="tooltip" '
     + 'data-original-title="' + course.favoritesCount + ' users have favorited this course" '
     + 'data-placement="bottom" '
