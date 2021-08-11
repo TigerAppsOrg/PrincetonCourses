@@ -672,3 +672,8 @@ body {
     left: 10px;
   }
 }
+
+/* Fix course label overlaps - override Bootstrap label padding */
+.label {
+  padding: 0.05em 0.3em;
+}
