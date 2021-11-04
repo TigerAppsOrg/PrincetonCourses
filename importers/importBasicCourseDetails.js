@@ -71,6 +71,8 @@ var loadCoursesFromRegistrar = function (query, externalCallback) {
   pythonMobileAppManager.stdout.on("data", (data) => {
       res += data.toString("utf8");
   });
+  console.log('res')
+  console.log(res)
   pythonMobileAppManager.stdout.on("end", () => {
       externalCallback(JSON.parse(res));
   });
