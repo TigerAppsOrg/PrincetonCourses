@@ -9,7 +9,6 @@ Princeton Courses is a web app that you can run on any modern computer. Follow t
     * `node importers/importBasicCourseDetails.js`
     * `node importers/scrapeEvaluations.js`
       (Press the return key when prompted.)
-    * `node importers/scrapeExtendedCourseDetails.js`
     * `node importers/importDepartments.js`
     * `node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js`
     * `node importers/setNewCourseFlag.js`
