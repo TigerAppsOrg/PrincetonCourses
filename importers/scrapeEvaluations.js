@@ -88,8 +88,8 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 }
 
 const instructions = [
-  '\t1. Copy this JavaScript command: ' + 'document.cookie.match(/PHPSESSID=([^;]+)/)[1]'.yellow,
-  '\t2. Visit this address in your web browser and run the copied JavaScript command in the developer console: https://reg-captiva.princeton.edu/chart/index.php\n'
+  '\t1. Visit and log in to: ' + 'https://registrarapps.princeton.edu/course-evaluation'.yellow,
+  '\t2. Copy the value of the cookie key ' + 'PHPSESSID'.yellow + ' in the Application panel of Chrome developer tools (i.e. Inspect Element)\n'
 ]
 
 console.log('Welcome to the script for scraping course evaluations from the Princeton University registrar\'s website.\n')
@@ -104,6 +104,8 @@ promptly.prompt('Paste the session cookie output from the developer console and 
 }).then(query => {
   // Connect to the database
   require('../controllers/database.js')
+
+  // evaluationModel.deleteMany({ "comment": { $regex: "^[0-9].[0-9]$" } }).then(() => { throw new Error("Forced ending"); })
 
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
   return courseModel.find(JSON.parse(query))
