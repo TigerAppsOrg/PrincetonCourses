@@ -103,6 +103,8 @@ promptly.prompt('Paste the session cookie output from the developer console and 
   return courseModel.find(JSON.parse(query))
 }).then(returnedCourses => {
   courses = returnedCourses;
+  if (process.argv.length > 2 && process.argv[2] == 'y')
+    return true
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
 }).then(confirmation => {
   if (!confirmation) {
