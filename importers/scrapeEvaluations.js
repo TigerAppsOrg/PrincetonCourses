@@ -42,12 +42,12 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
   loadPage(semester, courseID, function (data) {
     const $ = cheerio.load(data)
     if ($('title').text() !== 'Course Evaluation Results') {
-      console.error('Scraping the evaluations failed. Your session cookie was probably bad. You must provide a valid session cookie.')
+      console.error('Scraping the evaluations failed. Your session cookie probably expired. You must provide a valid session cookie.'.red)
       console.log('Goodbye.')
       process.exit(1)
     }
 
-    console.log('\tReceived data for course %s in semester %s.', courseID, semester)
+    console.log('\tReceived data for course %s in semester %s.'.green, courseID, semester)
 
     // Extract scores
     var scores = {}
@@ -82,7 +82,7 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 const instructions = [
   '\t1. Visit and log in to: ' + 'https://registrarapps.princeton.edu/course-evaluation'.yellow,
   '\t2. Copy the value of the cookie key ' + 'PHPSESSID'.yellow + ' in the Application panel of Chrome developer tools (i.e. Inspect Element)\n',
-  '\tNote: run this script with the argument --skip to bypass confirmation prompts'.red
+  '\tNote: run this script with the argument --skip to bypass confirmation prompts'.green
 ]
 
 console.log('Welcome to the script for scraping course evaluations from the Princeton University registrar\'s website.\n')
@@ -91,7 +91,7 @@ console.log(instructions.join('\n'))
 
 promptly.prompt('Paste the session cookie output from the developer console and hit enter:').then(cookie => {
   sessionCookie = cookie
-  return promptly.prompt('Enter the MongoDB-style query for the courses for which you want to import the evaluations:', {
+  return promptly.prompt('Enter the MongoDB-style query for the courses for which you want to import the evaluations ' + '(or simply press return to scrape everything)'.green + ':', {
     default: '{}',
   })
 }).then(query => {
@@ -125,7 +125,7 @@ promptly.prompt('Paste the session cookie output from the developer console and 
       return
     }
 
-    console.log(`Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${courseIndex} of ${courses.length}).`)
+    console.log(`Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${courseIndex} of ${courses.length}).`.yellow)
 
     // Fetch the evaluation data
     getCourseEvaluationData(thisCourse.semester._id, thisCourse.courseID, function (scores, comments) {
@@ -176,7 +176,7 @@ promptly.prompt('Paste the session cookie output from the developer console and 
         console.log(reason)
       })
     })
-  }, 500)
+  }, 100)
 }).catch(err => {
   console.error(err)
   process.exit(1)
