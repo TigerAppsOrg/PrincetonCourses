@@ -48,7 +48,7 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
       process.exit(1)
     }
 
-    console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
+    console.log('\tReceived data for course %s in semester %s.', courseID, semester)
 
     // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
     // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
@@ -58,31 +58,31 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 
     // Extract scores
     var scores = {}
-    var table_value = $(".data-bar-chart").attr('data-bar-chart')
-    if (typeof table_value === 'undefined') {
-      externalCallback({}, [])
-      return
+
+    if ($.html().includes(semester)) {
+      var table_value = $(".data-bar-chart").attr('data-bar-chart')
+      if (typeof table_value === 'undefined') {
+        externalCallback({}, [])
+        return
+      }
+      JSON.parse(table_value).forEach(function (arrayItem) {
+        scores[arrayItem['key']] = parseFloat(arrayItem['value'])
+      });
     }
-    JSON.parse(table_value).forEach(function (arrayItem) {
-      scores[arrayItem['key']] = parseFloat(arrayItem['value'])
-    });
 
     // Extract student comments
     const comments = []
-    var comment_values = $(".comment")
-    if (typeof comment_values === 'undefined') {
-      externalCallback({}, [])
-      return
+    if ($.html().includes(semester)) {
+      var comment_values = $(".comment")
+      if (typeof comment_values === 'undefined') {
+        externalCallback({}, [])
+        return
+      }
+      comment_values.each(function (index, element) {
+        comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
+      })
     }
-    comment_values.each(function(index, element) {
-      comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
-    })
 
-    // console.log(courseID);
-    // console.log("scores");
-    // console.log(scores);
-    // console.log("comments");
-    // console.log(comments)
     externalCallback(scores, comments)
   })
 }
@@ -108,7 +108,8 @@ promptly.prompt('Paste the session cookie output from the developer console and 
   // evaluationModel.deleteMany({ "comment": { $regex: "^[0-9].[0-9]$" } }).then(() => { throw new Error("Forced ending"); })
 
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
-  return courseModel.find(JSON.parse(query))
+  // return courseModel.find(JSON.parse(query))
+  return courseModel.find({ department: "COS", courseID: "002074" })
 }).then(returnedCourses => {
   courses = returnedCourses;
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
