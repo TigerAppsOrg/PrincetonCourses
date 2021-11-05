@@ -81,7 +81,8 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 
 const instructions = [
   '\t1. Visit and log in to: ' + 'https://registrarapps.princeton.edu/course-evaluation'.yellow,
-  '\t2. Copy the value of the cookie key ' + 'PHPSESSID'.yellow + ' in the Application panel of Chrome developer tools (i.e. Inspect Element)\n'
+  '\t2. Copy the value of the cookie key ' + 'PHPSESSID'.yellow + ' in the Application panel of Chrome developer tools (i.e. Inspect Element)\n',
+  '\tNote: run this script with the argument --skip to bypass confirmation prompts'.red
 ]
 
 console.log('Welcome to the script for scraping course evaluations from the Princeton University registrar\'s website.\n')
@@ -103,7 +104,7 @@ promptly.prompt('Paste the session cookie output from the developer console and 
   return courseModel.find(JSON.parse(query))
 }).then(returnedCourses => {
   courses = returnedCourses;
-  if (process.argv.length > 2 && process.argv[2] == 'y')
+  if (process.argv.length > 2 && process.argv[2] == '--skip')
     return true
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
 }).then(confirmation => {
