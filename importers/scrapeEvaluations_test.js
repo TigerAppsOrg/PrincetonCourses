@@ -1,3 +1,11 @@
+/* 
+TODO: 
+- The new place to parse is: https://registrarapps.princeton.edu/course-evaluation?courseinfo=002099&terminfo=1212
+- In dev console, go to 'Application'->'Storage'->'Cookies'->'PHPSESSID' for the new session cookie to paste
+- console.log(comments) outputs the course evaluation result NUMBERS and the term comparison NUMBERS
+- Need to parse comments
+*/
+
 // A script that uses Cheerio to scrape course evaluation information from the Registrar
 // At the moment this script does not save the data anywhere
 
@@ -22,7 +30,8 @@ let courses
 const loadPage = function (term, courseID, callback) {
   // Define the HTTP request options
   const options = {
-    url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
+    url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
+    // url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
     headers: {
       'Cookie': `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
@@ -48,20 +57,22 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     }
 
     console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
-
+    console.log("\textra line");
+    // console.log(data);
     // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
-      externalCallback({}, [])
-      return
-    }
-
+    // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
+    //   externalCallback({}, [])
+    //   return
+    // }
+    console.log("\tsecond line");
     // Get Chart Data
     const b64EncodedChartData = $('#chart_settings').attr('value')
     const scores = {}
     if (b64EncodedChartData) {
       const chartData = Buffer.from(b64EncodedChartData, 'base64').toString('ascii')
       const chart = JSON.parse(chartData)
-
+      console.log("\tChart");
+      console.log(chart);
       // Extract Numerical Evaluation Data from Chart
       const xItems = chart.PlotArea.XAxis.Items
       const yItems = chart.PlotArea.ListOfSeries[0].Items
@@ -75,7 +86,9 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     $('table:last-child tr:not(:first-child) td').each(function (index, element) {
       comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
     })
-
+    // console.log(courseID);
+    // console.log(scores);
+    // console.log(comments);
     externalCallback(scores, comments)
   })
 }
@@ -238,7 +251,10 @@ promptly.prompt(
           thisCourse.courseID,
           function (scores, comments) {
             let promises = [];
-
+            console.log(thisCourse.semester._id);
+            console.log(thisCourse.courseID);
+            console.log(scores);
+            console.log(comments);
             // Iterate over the comments
             for (const comment of comments) {
               // Save the comments to the database

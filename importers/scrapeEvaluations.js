@@ -22,7 +22,7 @@ let courses
 const loadPage = function (term, courseID, callback) {
   // Define the HTTP request options
   const options = {
-    url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
+    url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
     headers: {
       'Cookie': `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
@@ -47,42 +47,42 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
       process.exit(1)
     }
 
-    console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
+    console.log('\tReceived data for course %s in semester %s.', courseID, semester)
 
-    // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
-      externalCallback({}, [])
-      return
-    }
-
-    // Get Chart Data
-    const b64EncodedChartData = $('#chart_settings').attr('value')
-    const scores = {}
-    if (b64EncodedChartData) {
-      const chartData = Buffer.from(b64EncodedChartData, 'base64').toString('ascii')
-      const chart = JSON.parse(chartData)
-
-      // Extract Numerical Evaluation Data from Chart
-      const xItems = chart.PlotArea.XAxis.Items
-      const yItems = chart.PlotArea.ListOfSeries[0].Items
-      for (const itemIndex in chart.PlotArea.XAxis.Items) {
-        scores[xItems[itemIndex].Text] = parseFloat(yItems[itemIndex].YValue)
+    // Extract scores
+    var scores = {}
+    if ($.html().includes(semester)) {
+      var table_value = $(".data-bar-chart").attr('data-bar-chart')
+      if (typeof table_value === 'undefined') {
+        externalCallback({}, [])
+        return
       }
+      JSON.parse(table_value).forEach(function (arrayItem) {
+        scores[arrayItem['key']] = parseFloat(arrayItem['value'])
+      });
     }
 
     // Extract student comments
     const comments = []
-    $('table:last-child tr:not(:first-child) td').each(function (index, element) {
-      comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
-    })
+    if ($.html().includes(semester)) {
+      var comment_values = $(".comment")
+      if (typeof comment_values === 'undefined') {
+        externalCallback({}, [])
+        return
+      }
+      comment_values.each(function (index, element) {
+        comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
+      })
+    }
 
     externalCallback(scores, comments)
   })
 }
 
 const instructions = [
-  '\t1. Copy this JavaScript command: ' + 'document.cookie.match(/PHPSESSID=([^;]+)/)[1]'.yellow,
-  '\t2. Visit this address in your web browser and run the copied JavaScript command in the developer console: https://reg-captiva.princeton.edu/chart/index.php\n'
+  '\t1. Visit and log in to: ' + 'https://registrarapps.princeton.edu/course-evaluation'.yellow,
+  '\t2. Copy the value of the cookie key ' + 'PHPSESSID'.yellow + ' in the Application panel of Chrome developer tools (i.e. Inspect Element)\n',
+  '\tNote: run this script with the argument --skip to bypass confirmation prompts'.red
 ]
 
 console.log('Welcome to the script for scraping course evaluations from the Princeton University registrar\'s website.\n')
@@ -98,10 +98,14 @@ promptly.prompt('Paste the session cookie output from the developer console and 
   // Connect to the database
   require('../controllers/database.js')
 
+  // evaluationModel.deleteMany({ "comment": { $regex: "^[0-9].[0-9]$" } }).then(() => { throw new Error("Forced ending"); })
+
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
   return courseModel.find(JSON.parse(query))
 }).then(returnedCourses => {
   courses = returnedCourses;
+  if (process.argv.length > 2 && process.argv[2] == '--skip')
+    return true
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
 }).then(confirmation => {
   if (!confirmation) {
