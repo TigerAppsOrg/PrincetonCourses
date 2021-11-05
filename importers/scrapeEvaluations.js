@@ -23,7 +23,6 @@ const loadPage = function (term, courseID, callback) {
   // Define the HTTP request options
   const options = {
     url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
-    // url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
     headers: {
       'Cookie': `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
@@ -50,15 +49,8 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
 
     console.log('\tReceived data for course %s in semester %s.', courseID, semester)
 
-    // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
-    //   externalCallback({}, [])
-    //   return
-    // }
-
     // Extract scores
     var scores = {}
-
     if ($.html().includes(semester)) {
       var table_value = $(".data-bar-chart").attr('data-bar-chart')
       if (typeof table_value === 'undefined') {
@@ -108,8 +100,7 @@ promptly.prompt('Paste the session cookie output from the developer console and 
   // evaluationModel.deleteMany({ "comment": { $regex: "^[0-9].[0-9]$" } }).then(() => { throw new Error("Forced ending"); })
 
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
-  // return courseModel.find(JSON.parse(query))
-  return courseModel.find({ department: "COS", courseID: "002074" })
+  return courseModel.find(JSON.parse(query))
 }).then(returnedCourses => {
   courses = returnedCourses;
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
