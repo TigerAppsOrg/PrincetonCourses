@@ -173,7 +173,7 @@ var display_subtitle = function(course) {
       "?courseid=" +
       course.courseID +
       '&skip" target="_blank" style="text-decoration: none;">' +
-      '<span title="View course in TigerSnatch" class="label label-success" style="margin-left: 0.5em;">Snatch' +
+      '<span title="View course in TigerSnatch" class="label label-warning" style="margin-left: 0.5em;">TigerSnatch' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
       "</span></a>" +
       " ";
