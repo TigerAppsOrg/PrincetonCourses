@@ -169,7 +169,7 @@ var display_subtitle = function(course) {
       "</span></a>" +
       " ";
   var snatch_link =
-      '<a href="https://snatch.tigerapps.org/course' +
+      '<a href="https://tigersnatch.com/course' +
       "?courseid=" +
       course.courseID +
       '&skip" target="_blank" style="text-decoration: none;">' +
