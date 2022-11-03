@@ -41,6 +41,12 @@ class MobileApp:
     def get_all_dept_codes_json(self):
         return self._getJSON(self.configs.COURSE_COURSES, 'subject=list')
 
+    # wrapper function for _getJSON with the courses/terms endpoint.
+    # takes no arguments.
+
+    def get_terms(self):
+        return self._getJSON(self.configs.COURSE_TERMS, fmt='json')
+
     '''
     This function allows a user to make a request to 
     a certain endpoint, with the BASE_URL of 
@@ -86,6 +92,7 @@ class Configs:
         self.CONSUMER_SECRET = CONSUMER_SECRET
         self.BASE_URL = 'https://api.princeton.edu:443/student-app/1.0.1'
         self.COURSE_COURSES = '/courses/courses'
+        self.COURSE_TERMS = '/courses/terms'
         self.REFRESH_TOKEN_URL = 'https://api.princeton.edu:443/token'
         self._refreshToken(grant_type='client_credentials')
 
@@ -106,6 +113,7 @@ def main():
     api = MobileApp()
     if argv[1] == 'importBasicCourseDetails':
         all_codes = api.get_all_dept_codes_csv()
+        most_recent_term = api.get_terms()["term"][0]["code"]
         '''
         Add "&term=<TERM_CODE>" to the string below if you need to process
         courses from a specific term. For example, if you want to process
@@ -115,7 +123,7 @@ def main():
 
         Be sure to REVERT this change when done processing new courses!
         '''
-        args = argv[2] if len(argv) > 2 else f'subject={all_codes}'
+        args = argv[2] if len(argv) > 2 else f'subject={all_codes}&term={most_recent_term}'
         print(dumps(api.get_courses(args)))
     elif argv[1] == 'importDepartmentals':
         print(dumps(api.get_all_dept_codes_json()))
