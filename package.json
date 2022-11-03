@@ -18,6 +18,9 @@
     "request": "^2.88.0",
     "throttled-request": "^0.1.1"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
