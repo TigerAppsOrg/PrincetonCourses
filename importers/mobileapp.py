@@ -45,7 +45,7 @@ class MobileApp:
     # takes no arguments.
 
     def get_terms(self):
-        return self._getJSON(self.configs.COURSE_TERMS, fmt='json')
+        return self._getJSON(self.configs.COURSE_TERMS, 'fmt=json')
 
     '''
     This function allows a user to make a request to 
