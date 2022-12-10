@@ -10,7 +10,7 @@
     "cookie-session": "^2.0.0-beta.3",
     "dotenv": "^6.2.0",
     "ejs": "^2.6.1",
-    "express": "^4.16.4",
+    "express": "^4.17.3",
     "loglevel": "^1.6.1",
     "mongoose": "^5.13.15",
     "prompt": "^1.0.0",
