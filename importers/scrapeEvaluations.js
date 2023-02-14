@@ -177,6 +177,10 @@ promptly.prompt('Paste the session cookie output from the developer console and 
       })
     })
   }, 100)
+
+  // delete malformatted evaluations
+  evaluationModel.deleteMany({comment: {$regex: "^[0-9]$"}})
+  evaluationModel.deleteMany({comment: "."})
 }).catch(err => {
   console.error(err)
   process.exit(1)
