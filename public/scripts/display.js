@@ -181,7 +181,7 @@ var display_subtitle = function(course) {
       '<a href="https://tigermap.tigerapps.org/' +
       course.courseID +
       '" target="_blank" style="text-decoration: none;">' +
-      '<span title="View course in TigerMap" class="label label-warning" style="margin-left: 0.5em;">TigerMap' +
+      '<span title="View course in TigerMap" class="label label-success" style="margin-left: 0.5em;">TigerMap' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
       "</span></a>" +
       " ";
