@@ -173,11 +173,19 @@ var display_subtitle = function(course) {
       "?courseid=" +
       course.courseID +
       '&skip&princetoncourses" target="_blank" style="text-decoration: none;">' +
-      '<span title="View course in TigerSnatch" class="label label-warning" style="margin-left: 0.5em;">TigerSnatch' +
+      '<span title="View course in TigerSnatch" class="label label-warning">TigerSnatch' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
       "</span></a>" +
       " ";
-  $('#disp-subtitle-right').append(snatch_link + link + semester)
+  var tigermap_link =
+      '<a href="https://tigermap.tigerapps.org/' +
+      course.courseID +
+      '" target="_blank" style="text-decoration: none;">' +
+      '<span title="View course in TigerMap" class="label label-success">TigerMap' +
+      '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
+      "</span></a>" +
+      " ";
+  $('#disp-subtitle-right').append(tigermap_link + snatch_link + link + semester)
 }
 
 // display instructor info
