@@ -156,8 +156,7 @@ var display_subtitle = function(course) {
 
   var semester = course.semester.name;
 
-  // link to registrar
-  var link =
+  var course_link =
       '<a href="https://registrar.princeton.edu/course-offerings/course_details.xml' +
       "?courseid=" +
       course.courseID +
@@ -166,8 +165,7 @@ var display_subtitle = function(course) {
       '" target="_blank" style="text-decoration: none;">' +
       '<span title="View course in Course Offerings" class="label label-primary">Registrar' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
-      "</span></a>" +
-      " ";
+      "</span></a>";
   var snatch_link =
       '<a href="https://tigersnatch.com/course' +
       "?courseid=" +
@@ -175,17 +173,15 @@ var display_subtitle = function(course) {
       '&skip&princetoncourses" target="_blank" style="text-decoration: none;">' +
       '<span title="View course in TigerSnatch" class="label label-warning">TigerSnatch' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
-      "</span></a>" +
-      " ";
+      "</span></a>";
   var tigermap_link =
       '<a href="https://tigermap.tigerapps.org/' +
       course.courseID +
       '" target="_blank" style="text-decoration: none;">' +
       '<span title="View course in TigerMap" class="label label-success">TigerMap' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
-      "</span></a>" +
-      " ";
-  $('#disp-subtitle-right').append(tigermap_link + snatch_link + link + semester)
+      "</span></a>";
+  $('#disp-subtitle-right').append(`${semester} ${tigermap_link} ${snatch_link} ${course_link}`)
 }
 
 // display instructor info

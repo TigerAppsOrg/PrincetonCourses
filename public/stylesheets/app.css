@@ -530,6 +530,14 @@ body {
   z-index: 500;
 }
 
+#disp-subtitle-right {
+  display: flex;
+  justify-content: end;
+  flex-wrap: wrap;
+  column-gap: 4.5px;
+  margin-left: 8px;
+}
+
 /* INFO PANE CSS */
 #info-pane {
   background-color: #ddd;
