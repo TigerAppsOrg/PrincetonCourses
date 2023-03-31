@@ -7,7 +7,7 @@
   include('../partials/staticResources.ejs', {
     scripts: ['logout', 'demo', 'history', 'layout', 'resizable', 'feedback', 'navbar', 'icon', 'eval', 'fav', 'pin', 'display', 'suggest', 'search', 'app'],
     stylesheets: ['app', 'demo', 'navbar', 'feedback', 'scrollbar'],
-    release: release
+    release: 'v' + (Math.floor(Math.random() * 999999) + 500)
   })
   %>
 </head>
