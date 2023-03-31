@@ -174,6 +174,7 @@ var init_search = function() {
 
   // load the semesters for the dropdown
   $('#semester').children().remove()
+  // Use a random version number to force a reload of semesters
   var localReleaseVersion = releaseVersion || 'v1'
   $.get('/api/semesters?v=' + localReleaseVersion, function (semesters) {
     for (var semesterIndex in semesters) {
