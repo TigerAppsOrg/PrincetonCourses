@@ -3,14 +3,22 @@ let router = express.Router()
 
 // Load internal modules
 let auth = require('./authentication.js')
+let config = require('./config')
 
 // Check that the user is authenticated
 router.all('*', function (req, res, next) {
-  if (!auth.userIsAuthenticated(req)) {
+  const authHeader = req.headers['authorization']
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    if (token !== config.chatbotAPIKey) {
+      res.sendStatus(401)
+    }
+  } else if (!auth.userIsAuthenticated(req)) {
     res.sendStatus(401)
   } else {
     next()
   }
+  next()
 })
 
 // Prevent caching of PUT requests
