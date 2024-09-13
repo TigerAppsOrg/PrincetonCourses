@@ -150,11 +150,13 @@ router.use('/:id', function (req, res) {
       }
 
         // Note if the user has previously up-voted this comment
-      for (var commentIndex in queryCourse.evaluations.comments) {
-        queryCourse.evaluations.comments[commentIndex].voted = queryCourse.evaluations.comments[commentIndex].voters.indexOf(res.locals.user._id) > -1
-        delete queryCourse.evaluations.comments[commentIndex].voters
+      if (res.locals.user) { // if statement needed for chatbot api access
+        for (var commentIndex in queryCourse.evaluations.comments) {
+          queryCourse.evaluations.comments[commentIndex].voted = queryCourse.evaluations.comments[commentIndex].voters.indexOf(res.locals.user._id) > -1
+          delete queryCourse.evaluations.comments[commentIndex].voters
+        }
+        delete queryCourse.evaluations.commonName
       }
-      delete queryCourse.evaluations.commonName
     } else {
       queryCourse.evaluations = {}
       if (queryCourse.hasOwnProperty('scores')) {

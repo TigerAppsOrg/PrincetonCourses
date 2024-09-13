@@ -19,3 +19,6 @@ module.exports.port = port
 
 // The secret used to encrypt session database
 module.exports.sessionSecret = process.env.SESSION_SECRET || 'abcdefghijklmnop'
+
+// Chatbot API key
+module.exports.chatbotAPIKey = process.env.CHATBOT_API_KEY
