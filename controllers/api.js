@@ -11,12 +11,10 @@ router.all('*', function (req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     if (token !== config.chatbotAPIKey) {
-      res.sendStatus(401)
+      return res.sendStatus(401)
     }
   } else if (!auth.userIsAuthenticated(req)) {
-    res.sendStatus(401)
-  } else {
-    next()
+    return res.sendStatus(401)
   }
   next()
 })
