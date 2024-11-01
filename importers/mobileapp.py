@@ -90,7 +90,7 @@ class Configs:
     def __init__(self):
         self.CONSUMER_KEY = CONSUMER_KEY
         self.CONSUMER_SECRET = CONSUMER_SECRET
-        self.BASE_URL = 'https://api.princeton.edu:443/student-app/1.0.1'
+        self.BASE_URL = 'https://api.princeton.edu:443/student-app/1.0.3'
         self.COURSE_COURSES = '/courses/courses'
         self.COURSE_TERMS = '/courses/terms'
         self.REFRESH_TOKEN_URL = 'https://api.princeton.edu:443/token'

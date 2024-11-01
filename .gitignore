@@ -3,6 +3,7 @@
 
 # Heroku Config File
 .env
+.venv
 
 # Logs
 logs
