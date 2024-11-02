@@ -174,14 +174,7 @@ var display_subtitle = function(course) {
       '<span title="View course in TigerSnatch" class="label label-warning">TigerSnatch' +
       '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
       "</span></a>";
-  var tigermap_link =
-      '<a href="https://tigermap.tigerapps.org/' +
-      course.courseID +
-      '" target="_blank" style="text-decoration: none;">' +
-      '<span title="View course in TigerMap" class="label label-success">TigerMap' +
-      '<i class="fa fa-external-link" style="margin-left: 5px;"></i>' +
-      "</span></a>";
-  $('#disp-subtitle-right').append(`${semester} ${tigermap_link} ${snatch_link} ${course_link}`)
+  $('#disp-subtitle-right').append(`${semester} ${snatch_link} ${course_link}`)
 }
 
 // display instructor info
