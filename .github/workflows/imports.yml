@@ -203,7 +203,7 @@ jobs:
           done
       - name: Run evaluation scraper (non-interactive)
         env:
-          EVAL_SCRAPE_DELAY_MS: "600"
+          EVAL_SCRAPE_DELAY_MS: "150"
           EVAL_SCRAPE_MAX_RETRIES: "3"
           EVAL_SCRAPE_RETRY_BACKOFF_MS: "1000"
           EVAL_RANDOMIZE_ORDER: "true"
