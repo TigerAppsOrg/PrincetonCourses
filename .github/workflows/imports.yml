@@ -316,13 +316,58 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Restart Heroku dynos
+      - name: Restart Heroku dynos and wait
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
           HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
         run: |
           echo "::add-mask::${HEROKU_API_KEY}"
-          curl -sS -X DELETE \
-            -H "Accept: application/vnd.heroku+json; version=3" \
-            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
-            "https://api.heroku.com/apps/${HEROKU_APP_NAME}/dynos"
+          set -euo pipefail
+          base="https://api.heroku.com/apps/${HEROKU_APP_NAME}"
+          authHeader="Authorization: Bearer ${HEROKU_API_KEY}"
+          acceptHeader="Accept: application/vnd.heroku+json; version=3"
+
+          echo "Fetching current dyno state..."
+          curl -sS -H "$acceptHeader" -H "$authHeader" "$base/dynos" | tee before.json >/dev/null
+
+          echo "Issuing restart (DELETE /dynos)..."
+          http_code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE -H "$acceptHeader" -H "$authHeader" "$base/dynos")
+          echo "Heroku API status: ${http_code}"
+          if [ "$http_code" != "202" ] && [ "$http_code" != "200" ]; then
+            echo "Unexpected response from Heroku API when restarting dynos" >&2
+            # Fetch response body for debugging
+            curl -sS -X DELETE -H "$acceptHeader" -H "$authHeader" "$base/dynos" || true
+            exit 1
+          fi
+
+          echo "Waiting for dynos to cycle..."
+          attempts=0
+          max_attempts=30
+          sleep_seconds=2
+          changed=0
+          while [ $attempts -lt $max_attempts ]; do
+            sleep "$sleep_seconds"
+            attempts=$((attempts+1))
+            now=$(curl -sS -H "$acceptHeader" -H "$authHeader" "$base/dynos")
+            echo "$now" > after.json
+            # If jq is available, compare updated_at or created_at; else compare raw payloads
+            if command -v jq >/dev/null 2>&1; then
+              before_hash=$(jq -r 'map({name,updated_at})|tostring' before.json 2>/dev/null || echo "")
+              after_hash=$(jq -r 'map({name,updated_at})|tostring' after.json 2>/dev/null || echo "")
+              if [ "$before_hash" != "$after_hash" ]; then
+                changed=1
+                break
+              fi
+            else
+              if ! diff -q before.json after.json >/dev/null 2>&1; then
+                changed=1
+                break
+              fi
+            fi
+          done
+          if [ $changed -eq 1 ]; then
+            echo "Dynos changed state; restart confirmed."
+          else
+            echo "Dynos did not show a state change within timeout; restart may still have occurred. Showing current dynos:"
+            cat after.json || true
+          fi
