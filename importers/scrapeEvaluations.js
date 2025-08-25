@@ -97,11 +97,28 @@ console.log('Welcome to the script for scraping course evaluations from the Prin
 console.log('Course evaluations are protected behind Princeton\'s Central Authentication System. To scrape the course evaluations, follow these instructions:')
 console.log(instructions.join('\n'))
 
-promptly.prompt('Paste the session cookie output from the developer console and hit enter:').then(cookie => {
-  sessionCookie = cookie
+const envCookie = process.env.PHPSESSID || process.env.EVAL_PHPSESSID
+const envQuery = process.env.EVAL_QUERY || process.env.EVAL_QUERY_JSON
+
+const getCookie = () => {
+  if (envCookie && envCookie.trim().length > 0) {
+    return Promise.resolve(envCookie.trim())
+  }
+  return promptly.prompt('Paste the session cookie output from the developer console and hit enter:')
+}
+
+const getQuery = () => {
+  if (envQuery && envQuery.trim().length > 0) {
+    return Promise.resolve(envQuery.trim())
+  }
   return promptly.prompt('Enter the MongoDB-style query for the courses for which you want to import the evaluations ' + '(or simply press return to scrape everything)'.green + ':', {
     default: '{}',
   })
+}
+
+getCookie().then(cookie => {
+  sessionCookie = cookie
+  return getQuery()
 }).then(query => {
   // Connect to the database
   require('../controllers/database.js')

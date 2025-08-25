@@ -201,25 +201,26 @@ jobs:
               echo "$key=$val" >> $GITHUB_ENV
             fi
           done
-      - name: Run evaluation scraper
+      - name: Run evaluation scraper (non-interactive)
         env:
           EVAL_SCRAPE_DELAY_MS: "600"
           EVAL_SCRAPE_MAX_RETRIES: "3"
           EVAL_SCRAPE_RETRY_BACKOFF_MS: "1000"
           EVAL_RANDOMIZE_ORDER: "true"
           INPUT_TERM: ${{ inputs.term }}
+          PHPSESSID: ${{ inputs.php_sessid }}
         run: |
-          if [ -z "${{ inputs.php_sessid }}" ]; then
+          if [ -z "${PHPSESSID}" ]; then
             echo "php_sessid input is required to run evaluations" >&2
             exit 1
           fi
-          echo "::add-mask::${{ inputs.php_sessid }}"
+          echo "::add-mask::${PHPSESSID}"
           if [ -n "$INPUT_TERM" ]; then
-            EVAL_QUERY=$(node -e 'const term=process.env.INPUT_TERM; const q={semester:Number(term), "scores.Quality of Course": {"$exists": false}}; console.log(JSON.stringify(q));')
+            export EVAL_QUERY=$(node -e 'const term=process.env.INPUT_TERM; const q={semester:Number(term), "scores.Quality of Course": {"$exists": false}}; console.log(JSON.stringify(q));')
           else
-            EVAL_QUERY='{"scores.Quality of Course": {"$exists": false}}'
+            export EVAL_QUERY='{"scores.Quality of Course": {"$exists": false}}'
           fi
-          printf '%s\n%s\n' "${{ inputs.php_sessid }}" "$EVAL_QUERY" | node importers/scrapeEvaluations.js --skip
+          node importers/scrapeEvaluations.js --skip
 
   backfill_scores:
     if: ${{ inputs.run_backfill }}
