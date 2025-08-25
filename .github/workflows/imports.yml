@@ -216,12 +216,19 @@ jobs:
             exit 1
           fi
           echo "::add-mask::${PHPSESSID}"
+          # Build a query that includes courses missing scores OR ones backfilled from a previous semester.
+          # This ensures we replace placeholder scores with real evaluations when they are published.
           export EVAL_QUERY=$(node -e '
             const term = process.env.INPUT_TERM;
             const subj = process.env.INPUT_SUBJECT;
-            const q = { "scores.Quality of Course": { "$exists": false } };
-            if (term) q.semester = Number(term);
-            if (subj) q.department = String(subj).toUpperCase();
+            const andConds = [];
+            if (term) andConds.push({ semester: Number(term) });
+            if (subj) {
+              const S = String(subj).toUpperCase();
+              andConds.push({ $or: [ { department: S }, { "crosslistings.department": S } ] });
+            }
+            andConds.push({ $or: [ { "scores.Quality of Course": { $exists: false } }, { scoresFromPreviousSemester: true } ] });
+            const q = andConds.length > 1 ? { $and: andConds } : (andConds[0] || {});
             console.log(JSON.stringify(q));
           ')
           node importers/scrapeEvaluations.js --skip
