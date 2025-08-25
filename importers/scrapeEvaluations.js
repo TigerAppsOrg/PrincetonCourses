@@ -19,7 +19,7 @@ let sessionCookie
 let courses
 
 // Throttling and retry configuration
-const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '500', 10) // delay between course requests
+const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '250', 10) // delay between course requests
 const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '3', 10) // per-course retries on transient errors
 const RETRY_BACKOFF_MS = parseInt(process.env.EVAL_SCRAPE_RETRY_BACKOFF_MS || '1000', 10) // base backoff
 
