@@ -55,7 +55,6 @@ jobs:
     timeout-minutes: 180
     defaults:
       run:
-        working-directory: TigerApps/PrincetonCourses
         shell: bash
     steps:
       - name: Checkout
@@ -117,7 +116,6 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        working-directory: TigerApps/PrincetonCourses
         shell: bash
     steps:
       - name: Checkout
@@ -164,7 +162,6 @@ jobs:
     timeout-minutes: 240
     defaults:
       run:
-        working-directory: TigerApps/PrincetonCourses
         shell: bash
     steps:
       - name: Checkout
@@ -228,7 +225,6 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        working-directory: TigerApps/PrincetonCourses
         shell: bash
     steps:
       - name: Checkout
@@ -270,7 +266,6 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: TigerApps/PrincetonCourses
         shell: bash
     steps:
       - name: Checkout
