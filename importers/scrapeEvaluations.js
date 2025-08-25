@@ -18,6 +18,11 @@ const evaluationModel = require('../models/evaluation.js')
 let sessionCookie
 let courses
 
+// Throttling and retry configuration
+const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '500', 10) // delay between course requests
+const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '3', 10) // per-course retries on transient errors
+const RETRY_BACKOFF_MS = parseInt(process.env.EVAL_SCRAPE_RETRY_BACKOFF_MS || '1000', 10) // base backoff
+
 // Load a request from the server and call the function externalCallback
 const loadPage = function (term, courseID, callback) {
   // Define the HTTP request options
@@ -31,15 +36,18 @@ const loadPage = function (term, courseID, callback) {
 
   request(options, (err, response, body) => {
     if (err) {
-      return console.error(err)
+      return callback(err)
     }
-    callback(body)
+    callback(null, body)
   })
 }
 
 // Return the course evaluation data for the given semester/courseID to the function callback
 const getCourseEvaluationData = function (semester, courseID, externalCallback) {
-  loadPage(semester, courseID, function (data) {
+  loadPage(semester, courseID, function (err, data) {
+    if (err) {
+      return externalCallback(err)
+    }
     const $ = cheerio.load(data)
     if ($('title').text() !== 'Course Evaluation Results') {
       console.error('Scraping the evaluations failed. Your session cookie probably expired. You must provide a valid session cookie.'.red)
@@ -53,29 +61,29 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     var scores = {}
     if ($.html().includes(semester)) {
       var table_value = $(".data-bar-chart").attr('data-bar-chart')
-      if (typeof table_value === 'undefined') {
-        externalCallback({}, [])
-        return
+      if (typeof table_value !== 'undefined') {
+        try {
+          JSON.parse(table_value).forEach(function (arrayItem) {
+            scores[arrayItem['key']] = parseFloat(arrayItem['value'])
+          })
+        } catch (e) {
+          // ignore parse error and continue without scores for course
+        }
       }
-      JSON.parse(table_value).forEach(function (arrayItem) {
-        scores[arrayItem['key']] = parseFloat(arrayItem['value'])
-      });
     }
 
     // Extract student comments
     const comments = []
     if ($.html().includes(semester)) {
       var comment_values = $(".comment")
-      if (typeof comment_values === 'undefined') {
-        externalCallback({}, [])
-        return
+      if (typeof comment_values !== 'undefined') {
+        comment_values.each(function (index, element) {
+          comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
+        })
       }
-      comment_values.each(function (index, element) {
-        comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
-      })
     }
 
-    externalCallback(scores, comments)
+    externalCallback(null, scores, comments)
   })
 }
 
@@ -113,33 +121,24 @@ promptly.prompt('Paste the session cookie output from the developer console and 
     return process.exit(0)
   }
 
-  let coursesPendingProcessing = courses.length
-  let courseIndex = 0
+  const total = courses.length
+  let processed = 0
+  const failed = []
 
-  const interval = setInterval(function () {
-    const thisCourse = courses[courseIndex++]
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-    // If there are no more courses, cease sending requests
-    if (typeof (thisCourse) === 'undefined') {
-      clearInterval(interval)
-      return
-    }
+  const fetchCourse = (course) => new Promise((resolve, reject) => {
+    getCourseEvaluationData(course.semester._id, course.courseID, function (err, scores, comments) {
+      if (err) return reject(err)
 
-    console.log(`Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${courseIndex} of ${courses.length}).`.yellow)
-
-    // Fetch the evaluation data
-    getCourseEvaluationData(thisCourse.semester._id, thisCourse.courseID, function (scores, comments) {
       let promises = []
-
-      // Iterate over the comments
       for (const comment of comments) {
-        // Save the comments to the database
         promises.push(evaluationModel.findOneAndUpdate({
           comment: comment,
-          course: thisCourse._id
+          course: course._id
         }, {
           comment: comment,
-          course: thisCourse._id
+          course: course._id
         }, {
           new: true,
           upsert: true,
@@ -148,10 +147,9 @@ promptly.prompt('Paste the session cookie output from the developer console and 
         }).exec())
       }
 
-      // Update the course with the newly-fetched evaluation data
-      if (scores !== {}) {
+      if (scores && Object.keys(scores).length > 0) {
         promises.push(courseModel.update({
-          _id: thisCourse._id
+          _id: course._id
         }, {
           $set: {
             scores: scores
@@ -163,20 +161,62 @@ promptly.prompt('Paste the session cookie output from the developer console and 
         }))
       }
 
-      // Wait for all database operations to complete
-      Promise.all(promises).then(function () {
-        if (coursesPendingProcessing % 10 === 0) {
-          console.log(`${coursesPendingProcessing} courses still processing…`)
-        }
-        if (--coursesPendingProcessing === 0) {
-          console.log('Fetched and saved all the requested course evaluations.')
-          process.exit(0)
-        }
-      }).catch(function (reason) {
-        console.log(reason)
-      })
+      Promise.all(promises).then(() => resolve()).catch(reject)
     })
-  }, 100)
+  })
+
+  const attemptCourse = async (course) => {
+    let attempt = 0
+    while (attempt < MAX_RETRIES) {
+      try {
+        await fetchCourse(course)
+        return true
+      } catch (err) {
+        attempt++
+        const transient = (err && (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET'))
+        console.error((`Error on course ${course.courseID} (attempt ${attempt}/${MAX_RETRIES}): ${err && err.message || err}`).red)
+        if (!transient || attempt >= MAX_RETRIES) {
+          return false
+        }
+        await sleep(RETRY_BACKOFF_MS * attempt)
+      }
+    }
+    return false
+  }
+
+  const run = async () => {
+    for (let i = 0; i < courses.length; i++) {
+      const thisCourse = courses[i]
+      console.log(`Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${i + 1} of ${total}).`.yellow)
+      const ok = await attemptCourse(thisCourse)
+      if (!ok) failed.push(thisCourse)
+      processed++
+      const remaining = total - processed
+      if (remaining % 10 === 0) {
+        console.log(`${remaining} courses still processing…`)
+      }
+      await sleep(DELAY_MS)
+    }
+
+    // Second pass over failures (one more retry pass)
+    if (failed.length > 0) {
+      console.log((`Re-attempting ${failed.length} failed courses…`).yellow)
+      const secondPass = failed.splice(0)
+      for (const c of secondPass) {
+        const ok = await attemptCourse(c)
+        if (!ok) failed.push(c)
+        await sleep(DELAY_MS)
+      }
+    }
+
+    if (failed.length > 0) {
+      console.log((`Finished with ${failed.length} course(s) still failing.`).red)
+    }
+    console.log('Fetched and saved all the requested course evaluations.')
+    process.exit(0)
+  }
+
+  run()
 
   // delete malformatted evaluations
   evaluationModel.deleteMany({comment: {$regex: "^[0-9]$"}})
