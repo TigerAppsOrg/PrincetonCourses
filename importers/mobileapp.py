@@ -123,7 +123,16 @@ def main():
 
         Be sure to REVERT this change when done processing new courses!
         '''
-        args = argv[2] if len(argv) > 2 else f'subject={all_codes}&term={most_recent_term}'
+        # Build args: if a query was provided but without a subject, expand to all department codes.
+        if len(argv) > 2:
+            raw = argv[2]
+            # If subject is omitted or explicitly 'all', replace with full subject list
+            if 'subject=' not in raw:
+                args = f'subject={all_codes}&{raw}'
+            else:
+                args = raw.replace('subject=all', f'subject={all_codes}')
+        else:
+            args = f'subject={all_codes}&term={most_recent_term}'
         print(dumps(api.get_courses(args)))
     elif argv[1] == 'importDepartmentals':
         print(dumps(api.get_all_dept_codes_json()))
