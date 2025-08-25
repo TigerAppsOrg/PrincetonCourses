@@ -316,8 +316,8 @@ jobs:
         run: node importers/setNewCourseFlag.js
 
   restart_heroku:
-    if: ${{ inputs.restart_heroku && always() }}
-    needs: [import_departments]
+    if: ${{ inputs.restart_heroku && always() && !cancelled() }}
+    needs: [import_courses, import_departments, scrape_evals, backfill_scores, set_new_flag]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
