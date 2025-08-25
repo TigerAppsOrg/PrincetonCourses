@@ -110,10 +110,20 @@ promptly.prompt('Paste the session cookie output from the developer console and 
 
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
   return courseModel.find(JSON.parse(query))
-}).then(returnedCourses => {
-  courses = returnedCourses;
-  if (process.argv.length > 2 && process.argv[2] == '--skip')
-    return true
+}).then(async (returnedCourses) => {
+  courses = returnedCourses
+
+  // optional: randomized processing order to avoid repeating same leading set on reruns
+  if (String(process.env.EVAL_RANDOMIZE_ORDER || 'true').toLowerCase() === 'true') {
+    for (let i = courses.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const tmp = courses[i]
+      courses[i] = courses[j]
+      courses[j] = tmp
+    }
+  }
+
+  if (process.argv.length > 2 && process.argv[2] == '--skip') return true
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
 }).then(confirmation => {
   if (!confirmation) {
