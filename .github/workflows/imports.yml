@@ -1,0 +1,340 @@
+name: PrincetonCourses Imports
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_import_courses:
+        description: "Run course import (OIT + registrar details)"
+        type: boolean
+        default: true
+      run_import_departments:
+        description: "Run departments import (OIT)"
+        type: boolean
+        default: true
+      run_import_evals:
+        description: "Run evaluations scraper (requires PHPSESSID)"
+        type: boolean
+        default: true
+      run_backfill:
+        description: "Run backfill for missing Quality of Course"
+        type: boolean
+        default: false
+      run_setnew:
+        description: "Run setNewCourseFlag"
+        type: boolean
+        default: false
+      restart_heroku:
+        description: "Restart Heroku dynos at end (refresh dept cache)"
+        type: boolean
+        default: false
+      term:
+        description: "Target term code (e.g., 1252)"
+        type: string
+        required: false
+      subject:
+        description: "Target subject code (e.g., COS or all)"
+        type: string
+        required: false
+      php_sessid:
+        description: "Registrar PHPSESSID cookie (required for evals)"
+        type: string
+        required: false
+      registrar_fe_api_token:
+        description: "Optional override for registrar front-end API token"
+        type: string
+        required: false
+      eval_delay_ms:
+        description: "Eval scraper delay between requests (ms)"
+        type: string
+        default: "600"
+      eval_max_retries:
+        description: "Eval scraper max retries per course"
+        type: string
+        default: "3"
+      eval_backoff_ms:
+        description: "Eval scraper base backoff (ms)"
+        type: string
+        default: "1000"
+      eval_randomize:
+        description: "Randomize eval processing order"
+        type: boolean
+        default: true
+      backfill_term:
+        description: "Backfill term code (optional)"
+        type: string
+        required: false
+
+concurrency:
+  group: imports-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import_courses:
+    if: ${{ inputs.run_import_courses }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: TigerApps/PrincetonCourses
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Install Node deps
+        run: npm ci
+      - name: Load Heroku config vars
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          cfg=$(curl -sS \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
+          echo "$cfg" > heroku_config.json
+          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET CHATBOT_API_KEY HOST PORT REGISTRAR_FE_API_TOKEN; do
+            val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
+            if [ -n "$val" ]; then
+              echo "::add-mask::${val}"
+              echo "$key=$val" >> $GITHUB_ENV
+            fi
+          done
+      - name: Build query arg
+        id: q
+        run: |
+          q=""
+          if [ -n "${{ inputs.term }}" ] && [ -n "${{ inputs.subject }}" ]; then
+            q="term=${{ inputs.term }}&subject=${{ inputs.subject }}"
+          elif [ -n "${{ inputs.term }}" ]; then
+            q="term=${{ inputs.term }}&subject=all"
+          fi
+          echo "query=${q}" >> $GITHUB_OUTPUT
+      - name: Run course importer
+        env:
+          REGISTRAR_FE_API_TOKEN: ${{ inputs.registrar_fe_api_token }}
+        run: |
+          if [ -n "${{ steps.q.outputs.query }}" ]; then
+            node importers/importBasicCourseDetails.js "${{ steps.q.outputs.query }}"
+          else
+            node importers/importBasicCourseDetails.js
+          fi
+
+  import_departments:
+    if: ${{ inputs.run_import_departments }}
+    needs: [import_courses]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: TigerApps/PrincetonCourses
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Install Node deps
+        run: npm ci
+      - name: Load Heroku config vars
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          cfg=$(curl -sS \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
+          echo "$cfg" > heroku_config.json
+          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET; do
+            val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
+            if [ -n "$val" ]; then
+              echo "::add-mask::${val}"
+              echo "$key=$val" >> $GITHUB_ENV
+            fi
+          done
+      - name: Run departments importer
+        run: node importers/importDepartments.js
+
+  scrape_evals:
+    if: ${{ inputs.run_import_evals }}
+    needs: [import_courses]
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: TigerApps/PrincetonCourses
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Install Node deps
+        run: npm ci
+      - name: Load Heroku config vars
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          cfg=$(curl -sS \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
+          echo "$cfg" > heroku_config.json
+          for key in MONGODB_URI; do
+            val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
+            if [ -n "$val" ]; then
+              echo "::add-mask::${val}"
+              echo "$key=$val" >> $GITHUB_ENV
+            fi
+          done
+      - name: Run evaluation scraper
+        env:
+          EVAL_SCRAPE_DELAY_MS: ${{ inputs.eval_delay_ms }}
+          EVAL_SCRAPE_MAX_RETRIES: ${{ inputs.eval_max_retries }}
+          EVAL_SCRAPE_RETRY_BACKOFF_MS: ${{ inputs.eval_backoff_ms }}
+          EVAL_RANDOMIZE_ORDER: ${{ inputs.eval_randomize }}
+          INPUT_TERM: ${{ inputs.term }}
+        run: |
+          if [ -z "${{ inputs.php_sessid }}" ]; then
+            echo "php_sessid input is required to run evaluations" >&2
+            exit 1
+          fi
+          echo "::add-mask::${{ inputs.php_sessid }}"
+          if [ -n "$INPUT_TERM" ]; then
+            EVAL_QUERY=$(node -e 'const term=process.env.INPUT_TERM; const q={semester:Number(term), "scores.Quality of Course": {"$exists": false}}; console.log(JSON.stringify(q));')
+          else
+            EVAL_QUERY='{"scores.Quality of Course": {"$exists": false}}'
+          fi
+          printf '%s\n%s\n' "${{ inputs.php_sessid }}" "$EVAL_QUERY" | node importers/scrapeEvaluations.js --skip
+
+  backfill_scores:
+    if: ${{ inputs.run_backfill }}
+    needs: [scrape_evals]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: TigerApps/PrincetonCourses
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install Node deps
+        run: npm ci
+      - name: Load Heroku config vars
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          cfg=$(curl -sS \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
+          echo "$cfg" > heroku_config.json
+          val=$(node -e "const o=require('./heroku_config.json'); const k='MONGODB_URI'; if (o[k]) console.log(o[k]);")
+          if [ -n "$val" ]; then
+            echo "::add-mask::${val}"
+            echo "MONGODB_URI=$val" >> $GITHUB_ENV
+          fi
+      - name: Run backfill
+        run: |
+          if [ -n "${{ inputs.backfill_term }}" ]; then
+            node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js "${{ inputs.backfill_term }}"
+          else
+            node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js
+          fi
+
+  set_new_flag:
+    if: ${{ inputs.run_setnew }}
+    needs: [scrape_evals]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: TigerApps/PrincetonCourses
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install Node deps
+        run: npm ci
+      - name: Load Heroku config vars
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          cfg=$(curl -sS \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
+          echo "$cfg" > heroku_config.json
+          val=$(node -e "const o=require('./heroku_config.json'); const k='MONGODB_URI'; if (o[k]) console.log(o[k]);")
+          if [ -n "$val" ]; then
+            echo "::add-mask::${val}"
+            echo "MONGODB_URI=$val" >> $GITHUB_ENV
+          fi
+      - name: Run setNewCourseFlag
+        run: node importers/setNewCourseFlag.js
+
+  restart_heroku:
+    if: ${{ inputs.restart_heroku && always() }}
+    needs: [import_departments]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restart Heroku dynos
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+        run: |
+          echo "::add-mask::${HEROKU_API_KEY}"
+          curl -sS -X DELETE \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer ${HEROKU_API_KEY}" \
+            "https://api.heroku.com/apps/${HEROKU_APP_NAME}/dynos"
