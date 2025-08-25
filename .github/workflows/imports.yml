@@ -32,15 +32,15 @@ on:
         type: string
         required: false
       subject:
-        description: "Target subject code (e.g., COS or all)"
+        description: "Target subject code (e.g., COS). Leave blank for all"
         type: string
         required: false
       php_sessid:
         description: "Registrar PHPSESSID cookie (required for evals)"
         type: string
         required: false
-      backfill_term:
-        description: "Backfill term code (optional)"
+      registrar_fe_api_token:
+        description: "Registrar FE API token (paste per run; overrides scrape)"
         type: string
         required: false
 
@@ -84,7 +84,7 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET CHATBOT_API_KEY HOST PORT REGISTRAR_FE_API_TOKEN; do
+          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET CHATBOT_API_KEY HOST PORT; do
             val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
             if [ -n "$val" ]; then
               echo "::add-mask::${val}"
@@ -102,7 +102,10 @@ jobs:
           fi
           echo "query=${q}" >> $GITHUB_OUTPUT
       - name: Run course importer
+        env:
+          REGISTRAR_FE_API_TOKEN: ${{ inputs.registrar_fe_api_token }}
         run: |
+          if [ -n "${{ inputs.registrar_fe_api_token }}" ]; then echo "::add-mask::${{ inputs.registrar_fe_api_token }}"; fi
           if [ -n "${{ steps.q.outputs.query }}" ]; then
             node importers/importBasicCourseDetails.js "${{ steps.q.outputs.query }}"
           else
@@ -253,8 +256,8 @@ jobs:
           fi
       - name: Run backfill
         run: |
-          if [ -n "${{ inputs.backfill_term }}" ]; then
-            node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js "${{ inputs.backfill_term }}"
+          if [ -n "${{ inputs.term }}" ]; then
+            node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js "${{ inputs.term }}"
           else
             node importers/insertMostRecentScoreIntoUnevaluatedSemesters.js
           fi
