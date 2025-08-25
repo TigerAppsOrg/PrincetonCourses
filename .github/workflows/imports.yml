@@ -39,26 +39,6 @@ on:
         description: "Registrar PHPSESSID cookie (required for evals)"
         type: string
         required: false
-      registrar_fe_api_token:
-        description: "Optional override for registrar front-end API token"
-        type: string
-        required: false
-      eval_delay_ms:
-        description: "Eval scraper delay between requests (ms)"
-        type: string
-        default: "600"
-      eval_max_retries:
-        description: "Eval scraper max retries per course"
-        type: string
-        default: "3"
-      eval_backoff_ms:
-        description: "Eval scraper base backoff (ms)"
-        type: string
-        default: "1000"
-      eval_randomize:
-        description: "Randomize eval processing order"
-        type: boolean
-        default: true
       backfill_term:
         description: "Backfill term code (optional)"
         type: string
@@ -123,8 +103,6 @@ jobs:
           fi
           echo "query=${q}" >> $GITHUB_OUTPUT
       - name: Run course importer
-        env:
-          REGISTRAR_FE_API_TOKEN: ${{ inputs.registrar_fe_api_token }}
         run: |
           if [ -n "${{ steps.q.outputs.query }}" ]; then
             node importers/importBasicCourseDetails.js "${{ steps.q.outputs.query }}"
@@ -225,10 +203,10 @@ jobs:
           done
       - name: Run evaluation scraper
         env:
-          EVAL_SCRAPE_DELAY_MS: ${{ inputs.eval_delay_ms }}
-          EVAL_SCRAPE_MAX_RETRIES: ${{ inputs.eval_max_retries }}
-          EVAL_SCRAPE_RETRY_BACKOFF_MS: ${{ inputs.eval_backoff_ms }}
-          EVAL_RANDOMIZE_ORDER: ${{ inputs.eval_randomize }}
+          EVAL_SCRAPE_DELAY_MS: "600"
+          EVAL_SCRAPE_MAX_RETRIES: "3"
+          EVAL_SCRAPE_RETRY_BACKOFF_MS: "1000"
+          EVAL_RANDOMIZE_ORDER: "true"
           INPUT_TERM: ${{ inputs.term }}
         run: |
           if [ -z "${{ inputs.php_sessid }}" ]; then
