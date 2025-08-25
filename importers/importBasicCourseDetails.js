@@ -308,27 +308,61 @@ if (process.argv.length > 2) {
 }
 
 const getRegistrarFrontEndAPIToken = function (callback) {
+  if (process.env.REGISTRAR_FE_API_TOKEN && process.env.REGISTRAR_FE_API_TOKEN.trim().length > 0) {
+    return callback(null, process.env.REGISTRAR_FE_API_TOKEN.trim())
+  }
   request('https://registrar.princeton.edu/course-offerings', function (error, response, body) {
     if (error) {
       return callback(error)
     }
-
-    const $ = cheerio.load(body)
-    const registrarFrontEndAPIToken = JSON.parse($('[data-drupal-selector="drupal-settings-json"]').text()).ps_registrar.apiToken
-    callback(null, registrarFrontEndAPIToken)
+    try {
+      const $ = cheerio.load(body)
+      let tokenText = ''
+      const el = $('[data-drupal-selector="drupal-settings-json"]')
+      if (el && el.length > 0) {
+        tokenText = el.text() || ''
+      }
+      let token = ''
+      if (tokenText && tokenText.trim().length > 0) {
+        try {
+          const obj = JSON.parse(tokenText)
+          if (obj && obj.ps_registrar && obj.ps_registrar.apiToken) {
+            token = obj.ps_registrar.apiToken
+          }
+        } catch (e) {
+          // fallthrough to regex scan
+        }
+      }
+      if (!token) {
+        // Attempt regex search through all scripts as a fallback
+        $('script').each((i, s) => {
+          if (token) return
+          const txt = $(s).html() || ''
+          const m = txt.match(/\"apiToken\"\s*:\s*\"([^\"]+)\"/)
+          if (m && m[1]) {
+            token = m[1]
+          }
+        })
+      }
+      if (!token) {
+        return callback(new Error('Could not locate registrar front-end API token in course-offerings page. Set REGISTRAR_FE_API_TOKEN to override.'))
+      }
+      callback(null, token)
+    } catch (e) {
+      callback(e)
+    }
   })
 }
 
 console.log("Acquiring API token for the registrar's website front-end API")
-
 getRegistrarFrontEndAPIToken(function (error, apiToken) {
   if (error) {
     console.log('Failed getting registrarFrontEndAPIToken')
-    return console.log(error)
+    console.log(error)
+    process.exit(1)
   }
   console.log('Got registrarFrontEndAPIToken')
   registrarFrontEndAPIToken = apiToken
+  // Only start loading courses after token is available to avoid undefined header usage
+  loadCoursesFromRegistrar(queryString, importDataFromRegistrar)
 })
-
-// Execute a script to import courses from all available semesters ("terms") and all available departments ("subjects")
-loadCoursesFromRegistrar(queryString, importDataFromRegistrar)
