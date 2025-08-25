@@ -171,12 +171,32 @@ var importSubject = async function (semester, subject) {
         return console.log(error)
       }
       console.log(`Got results for ${courseData.course_id}`)
-      let frontEndApiCourseDetails
-      try {
-        frontEndApiCourseDetails = JSON.parse(body).course_details.course_detail[0]
-      } catch (error) {
-        return console.error(error)
+
+      // Ensure valid response shape from registrar API
+      if (!response || response.statusCode !== 200) {
+        console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.statusCode}`)
+        coursesPendingProcessing--
+        return
       }
+
+      let parsed
+      try {
+        parsed = JSON.parse(body)
+      } catch (e) {
+        console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
+        coursesPendingProcessing--
+        return
+      }
+
+      const detailsRoot = parsed && parsed.course_details
+      const detailsArr = detailsRoot && detailsRoot.course_detail
+      if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
+        console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
+        coursesPendingProcessing--
+        return
+      }
+
+      let frontEndApiCourseDetails = detailsArr[0]
 
       // Grading Basis
       switch (frontEndApiCourseDetails.grading_basis) {
