@@ -94,11 +94,16 @@ jobs:
       - name: Build query arg
         id: q
         run: |
+          term="${{ inputs.term }}"
+          subj_raw="${{ inputs.subject }}"
+          # Trim whitespace from subject
+          subj="$(printf %s "$subj_raw" | tr -d '[:space:]')"
           q=""
-          if [ -n "${{ inputs.term }}" ] && [ -n "${{ inputs.subject }}" ]; then
-            q="term=${{ inputs.term }}&subject=${{ inputs.subject }}"
-          elif [ -n "${{ inputs.term }}" ]; then
-            q="term=${{ inputs.term }}&subject=all"
+          if [ -n "$term" ] && [ -n "$subj" ]; then
+            q="term=${term}&subject=${subj}"
+          elif [ -n "$term" ]; then
+            # When subject is blank, pass only the term
+            q="term=${term}"
           fi
           echo "query=${q}" >> $GITHUB_OUTPUT
       - name: Run course importer
