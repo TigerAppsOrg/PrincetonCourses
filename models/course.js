@@ -138,6 +138,10 @@ courseSchema.on('index', function (error) {
 
 // Automatically populate instructors and semester
 var autoPopulate = function (next) {
+  // Allow queries to opt-out of autopopulate to reduce load (e.g., search)
+  if (this && this.options && this.options._skipAutoPopulate) {
+    return next()
+  }
   this.populate('instructors semester semesters')
   next()
 }
