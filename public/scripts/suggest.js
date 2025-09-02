@@ -141,7 +141,8 @@ const filters = [
     'label': 'Special',
     'options': {
       '*': 'All courses',
-      'NEW': 'New course'
+      'NEW': 'New course',
+      "OTF": "Open to first-year undergraduates"
     },
     'props': {
       'clearall': 1
