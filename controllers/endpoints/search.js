@@ -19,6 +19,9 @@ departmentModel.getAll(function (fetchedDepartments) {
 
 // Intelligent searching for both courses and instructors
 router.use('/:query', function (req, res) {
+  // If the client disconnects, stop heavy processing early
+  let clientGone = false
+  res.on('close', () => { clientGone = true })
   // Validate that the request contains a query
   if (typeof (req.params.query) === 'undefined') {
     res.sendStatus(400)
@@ -93,7 +96,8 @@ router.use('/:query', function (req, res) {
     } else if ((matches = courseDeptNumberRegexp.exec(thisQueryWord)) !== null) {
       // Expand "COS333" to "COS 333"
       newQueryWords.push(matches[1], matches[2])
-    } else if (thisQueryWord !== '*' && thisQueryWord.length > 0) {
+    } else if (thisQueryWord !== '*' && thisQueryWord.length >= 2) {
+      // Only include tokens with length >= 2 to avoid pathological 1-letter regexes
       newQueryWords.push(thisQueryWord)
     }
   })
@@ -213,11 +217,23 @@ router.use('/:query', function (req, res) {
   const dbCourseQuery = Object.assign({}, courseQuery)
   if (dbCourseQuery.OTF) delete dbCourseQuery.OTF
   promises.push(courseModel.find(dbCourseQuery, courseProjection).exec())
+  
+  const COURSE_LIMIT = parseInt(process.env.SEARCH_COURSE_LIMIT || '150', 10)
+  const courseFindQuery = courseModel
+    .find(courseQuery, courseProjection)
+    .setOptions({_skipAutoPopulate: true})
+    .limit(COURSE_LIMIT)
+    .maxTimeMS(7000)
+  promises.push(courseFindQuery.exec())
   promiseNames.push('courses')
 
   // Construct the instructorModel database query as a promise
   if (newQueryWords.length > 0) {
-    promises.push(instructorModel.find(instructorQuery, instructorProjection).exec())
+    const instructorFindQuery = instructorModel
+      .find(instructorQuery, instructorProjection)
+      .limit(50)
+      .maxTimeMS(5000)
+    promises.push(instructorFindQuery.exec())
     promiseNames.push('instructors')
   }
 
@@ -235,6 +251,8 @@ router.use('/:query', function (req, res) {
         var clashDetectionCourses = user.clashDetectionCourses
       }
     }
+
+    if (clientGone) { return }
 
     // Guard against the query results being null
     if (typeof (courses) === 'undefined' || courses.length === 0) {
@@ -316,18 +334,26 @@ router.use('/:query', function (req, res) {
       })
     })
 
-    // Detect clashes
+    // Detect clashes – budgeted to avoid CPU blowups
     if (detectClashes) {
-      var detectClashesResult = courseClashDetector.detectCourseClash(clashDetectionCourses, courses, parseInt(courseQuery.semester))
-      if (detectClashesResult.hasOwnProperty('status')) {
-        if (detectClashesResult.status === 'success') {
-          courses = detectClashesResult.courses
-        } else if (detectClashesResult.status === 'favoritesClash' && courses.length > 0) {
-          for (let courseIndex in courses) {
-            courses[courseIndex].favoritesClash = true
+      const CLASH_BUDGET = parseInt(process.env.SEARCH_CLASH_BUDGET || '60', 10)
+      if (filterOutClashes && courses.length > CLASH_BUDGET) {
+        // When filtering, only evaluate top N to keep semantics and bound work
+        courses = courses.slice(0, CLASH_BUDGET)
+      }
+      if (courses.length <= CLASH_BUDGET && !clientGone) {
+        var detectClashesResult = courseClashDetector.detectCourseClash(clashDetectionCourses, courses, parseInt(courseQuery.semester))
+        if (detectClashesResult.hasOwnProperty('status')) {
+          if (detectClashesResult.status === 'success') {
+            courses = detectClashesResult.courses
+          } else if (detectClashesResult.status === 'favoritesClash' && courses.length > 0) {
+            for (let courseIndex in courses) {
+              courses[courseIndex].favoritesClash = true
+            }
           }
         }
       }
+      // If over budget and not filtering, skip clash detection entirely to avoid heavy CPU
     }
 
     // Filter out clashing courses if requested by the client

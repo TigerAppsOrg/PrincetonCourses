@@ -17,6 +17,9 @@ var getSearchQueryURL = function () {
   return '?' + parameters.join('&')
 }
 
+// track the current in-flight search to abort stale requests
+var currentSearchRequest = null;
+
 // update search results from the search box
 var searchFromBox = function(noswipe) {
   // query url
@@ -80,8 +83,13 @@ var searchForCourses = function (query, semester, sort, filterClashes, noswipe) 
 
   updateSuggest()
 
+  // abort any in-flight search to avoid piling up work while typing
+  if (currentSearchRequest && typeof currentSearchRequest.abort === 'function') {
+    try { currentSearchRequest.abort() } catch (e) {}
+  }
+
   // search!
-  $.get(search, function (results, success, xhr) {
+  currentSearchRequest = $.get(search, function (results, success, xhr) {
     if (!success) {
       window.alert('An error occured and your search could not be completed.')
       return false
@@ -119,6 +127,8 @@ var searchForCourses = function (query, semester, sort, filterClashes, noswipe) 
 
     $('#search-load-indicator').hide()
     $('#search-results').stop().css('opacity', '')
+  }).always(function () {
+    currentSearchRequest = null
   })
 
 }
