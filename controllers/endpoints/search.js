@@ -50,6 +50,8 @@ router.use('/:query', function (req, res) {
   const catalogNumberLevel = /\dXX/i
   let departmentsQueried = []
   let catalogNumberQueriedLevels = []
+  // Optional: capture more specific numeric prefixes like "35" in COS35
+  let catalogNumberQueriedPrefixes = []
   queryWords.forEach(function (thisQueryWord) {
     thisQueryWord = thisQueryWord.toUpperCase()
     let matches
@@ -93,6 +95,19 @@ router.use('/:query', function (req, res) {
     } else if ((matches = courseDeptNumberRegexp.exec(thisQueryWord)) !== null) {
       // Expand "COS333" to "COS 333"
       newQueryWords.push(matches[1], matches[2])
+      // Also treat the department code as a department filter so DB query narrows correctly
+      if (departments.some(function (department) { return department._id === matches[1] })) {
+        if (departmentsQueried.indexOf(matches[1]) === -1) {
+          departmentsQueried.push(matches[1])
+        }
+      }
+      // If the numeric part is a single digit (e.g., COS3), interpret as the level (300s)
+      if (matches[2].length === 1) {
+        catalogNumberQueriedLevels.push(parseInt(matches[2]) * 100)
+      } else if (matches[2].length === 2) {
+        // If it's two digits (e.g., COS33), use a regex prefix constraint like ^33
+        catalogNumberQueriedPrefixes.push(matches[2])
+      }
     } else if (thisQueryWord !== '*' && thisQueryWord.length >= 2) {
       // Only include tokens with length >= 2 to avoid pathological 1-letter regexes
       newQueryWords.push(thisQueryWord)
@@ -143,6 +158,21 @@ router.use('/:query', function (req, res) {
     })
     courseQuery['$and'].push({
       $or: catalogNumberQueriedLevelsConstructed
+    })
+  }
+
+  // Allow filtering by catalog number two-digit prefixes (e.g., 33 -> 330-339)
+  if (catalogNumberQueriedPrefixes.length > 0) {
+    if (!courseQuery.hasOwnProperty('$and')) {
+      courseQuery['$and'] = []
+    }
+    let catalogNumberPrefixConstructed = catalogNumberQueriedPrefixes.map(function (prefix) {
+      return {
+        catalogNumber: new RegExp('^' + prefix)
+      }
+    })
+    courseQuery['$and'].push({
+      $or: catalogNumberPrefixConstructed
     })
   }
 
