@@ -21,6 +21,11 @@ let app = express()
 app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 
+// serve static assets before session logic so they bypass database lookups
+app.use(express.static(path.join(__dirname, '/public'), {
+  maxAge: '12h'
+}))
+
 // Load internal modules
 let config = require('./controllers/config')
 let auth = require('./controllers/authentication.js')
@@ -110,11 +115,6 @@ app.get('/app', function (req, res) {
 app.get('/privacy', function (req, res) {
   res.render('pages/privacy', res.locals.renderLocals)
 })
-
-// Map any files in the /public folder to the root of our domain
-// For example, if there is a file at /public/cat.jpg of this app,
-// it can be accessed on the web at [APP DOMAIN NAME]/cat.jpg
-app.use(express.static(path.join(__dirname, '/public')))
 
 app.get('*', function (req, res) {
   res.sendStatus(404)
