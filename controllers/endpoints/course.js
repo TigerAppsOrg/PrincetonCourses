@@ -90,7 +90,7 @@ router.use('/:id', function (req, res) {
   }).sort({semester: -1}).exec()
 
     // Query the database for the number of users who have marked this course as a favorite
-  var favoriteCountPromise = userModel.count({
+  var favoriteCountPromise = userModel.countDocuments({
     favoriteCourses: req.params.id
   }).exec()
 

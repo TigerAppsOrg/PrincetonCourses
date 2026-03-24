@@ -25,14 +25,8 @@ var departmentSchema = new mongoose.Schema({
 })
 
 // Return all of the departments
-departmentSchema.statics.getAll = function (callback) {
-  this.find().sort({_id: 1}).exec(function (err, departments) {
-    if (err) {
-      console.log(err)
-    } else {
-      callback(departments)
-    }
-  })
+departmentSchema.statics.getAll = async function () {
+  return this.find().sort({ _id: 1 }).exec()
 }
 
 // Create the Department model from the courseSchema

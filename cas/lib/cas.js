@@ -1025,7 +1025,7 @@ var parseAttributes = function(elemSuccess)
             var node = elemAttribute.children()[i];
             var attrName = node.name.toLowerCase().replace(/cas:/, '');
             if (attrName != '#text') {
-                var attrValue = cheerio(node).text();
+                var attrValue = cheerio.load(node).text();
                 if (!attributes[attrName]) {
                     attributes[attrName] = [attrValue];
                 } else {
@@ -1064,7 +1064,7 @@ var parseAttributes = function(elemSuccess)
                     break;
                 default:
                     var attrName = tagName;
-                    var attrValue = cheerio(node).text();
+                    var attrValue = cheerio.load(node).text();
                     if (attrValue != '') {
                         if (!attributes[attrName]) {
                             attributes[attrName] = [attrValue];

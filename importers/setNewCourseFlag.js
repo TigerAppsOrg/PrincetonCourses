@@ -8,24 +8,24 @@ var courseModel = require('../models/course.js')
 // Connect to the database
 require('../controllers/database.js')
 
-courseModel.distinct('courseID', {'scores.Quality of Course': {$exists: false}}).then(async function (courseIDs) {
+courseModel.distinct('courseID', { 'scores.Quality of Course': { $exists: false } }).then(async function (courseIDs) {
   console.log(`Processing ${courseIDs.length} courses that currently lack scores`)
   const promises = []
   for (const courseID of courseIDs) {
-    const count = await courseModel.count({courseID: courseID})
+    const count = await courseModel.countDocuments({ courseID: courseID })
     if (count === 1) {
-      promises.push(courseModel.update({
+      promises.push(courseModel.updateOne({
         courseID: courseID
       }, {
-        new: true
+        $set: { new: true }
       }).exec())
     }
   }
   console.log(`Setting new flag on  ${promises.length} courses`)
   return Promise.all(promises)
-}).then(result => {
+}).then(function (result) {
   console.log('Done!')
   process.exit(0)
-}).catch(err => {
+}).catch(function (err) {
   return console.error(err)
 })

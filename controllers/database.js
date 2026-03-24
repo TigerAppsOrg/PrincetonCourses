@@ -10,12 +10,11 @@ var config = require('./config.js')
 // The connection is made asynchronously.  Mongoose will queue up database
 // operations and release them when the connection is complete.
 console.log('Attempting to connect to the database.')
-mongoose.Promise = global.Promise
-mongoose.connect(config.mongoDBURI, { useNewUrlParser: true }, function (error, res) {
-  if (error) {
+mongoose.connect(config.mongoDBURI)
+  .then(function () {
+    console.log('Connecting to the database succeeded.')
+  })
+  .catch(function (error) {
     console.log('Connecting to the database failed. Databse URI: %s, Error: %s.', config.mongoDBURI, error)
     process.exit(1)
-  } else {
-    console.log('Connecting to the database succeeded.')
-  }
-})
+  })

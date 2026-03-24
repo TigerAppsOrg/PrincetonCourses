@@ -13,7 +13,7 @@ let departmentModel = require.main.require('./models/department.js')
 
 // Load the departments once from the database
 let departments = []
-departmentModel.getAll(function (fetchedDepartments) {
+departmentModel.getAll().then(function (fetchedDepartments) {
   departments = fetchedDepartments
 })
 

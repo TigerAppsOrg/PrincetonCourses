@@ -52,9 +52,9 @@ router.get('/verify', function (req, res) {
   }
 
   // Check if the user's ticket is valid
-  cas.validate(ticket, function (err, status, netid) {
+  cas.validate(ticket, async function (err, status, netid) {
     if (err) {
-      console.log("Failed to Validate Ticket")
+      console.log('Failed to Validate Ticket')
       console.log(err)
       res.sendStatus(500)
       return
@@ -66,31 +66,20 @@ router.get('/verify', function (req, res) {
       netid: netid
     }
 
-    // Find the user in the database with this netid
-    UserModel.findById(netid, function (err, user) {
-      if (err) {
-        console.log(err)
-        res.sendStatus(500)
-        return
-      }
+    try {
+      // Find the user in the database with this netid
+      var user = await UserModel.findById(netid)
 
       // If the user doesn't exist, create a new user
       if (user == null) {
-        var newUser = new UserModel({
-          _id: netid
-        })
-        newUser.save(function (error) {
-          if (error) {
-            console.log(error)
-            res.sendStatus(500)
-            return
-          }
-          res.redirect(redirectDestination)
-        })
-      } else {
-        res.redirect(redirectDestination)
+        var newUser = new UserModel({ _id: netid })
+        await newUser.save()
       }
-    })
+      res.redirect(redirectDestination)
+    } catch (error) {
+      console.log(error)
+      res.sendStatus(500)
+    }
   })
 })
 
@@ -110,20 +99,18 @@ var userIsAuthenticated = function (req) {
 module.exports.userIsAuthenticated = userIsAuthenticated
 
 // Find the details of the currently logged in user
-var loadUser = function (req, res, next) {
+var loadUser = async function (req, res, next) {
   if (req.session.cas) {
-    UserModel.findOne({_id: req.session.cas.netid}, function (err, user) {
-      if (err) {
-        console.log(err)
-      }
+    try {
+      var user = await UserModel.findOne({ _id: req.session.cas.netid })
       if (user != null) {
         // Save the user for the duration of the request
         res.locals.user = user
       }
-      next()
-    })
-  } else {
-    next()
+    } catch (err) {
+      console.log(err)
+    }
   }
+  next()
 }
 module.exports.loadUser = loadUser

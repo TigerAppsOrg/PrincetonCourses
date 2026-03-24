@@ -23,9 +23,9 @@ const abbreviatedCourseProjection = {
   instructors: 0
 }
 
-// Load the departments once from the database
+// Load the semesters once from the database
 let semesters = []
-semesterModel.getAll(function (fetchedSemesters) {
+semesterModel.getAll().then(function (fetchedSemesters) {
   semesters = fetchedSemesters
 })
 
@@ -39,10 +39,10 @@ router.route('/:id').all(function (req, res, next) {
 }).put(function (req, res) {
   var user = res.locals.user
 
-  let userPopulatePromise = res.locals.user.populate('clashDetectionCourses').execPopulate()
+  let userPopulatePromise = res.locals.user.populate('clashDetectionCourses')
 
   // Update the user's list of favorite courses
-  var updateUserPromise = userModel.update({
+  var updateUserPromise = userModel.updateOne({
     _id: user._id
   }, {
     $addToSet: {
@@ -86,71 +86,69 @@ router.route('/:id').all(function (req, res, next) {
     console.log(error)
     res.sendStatus(500)
   })
-}).delete(function (req, res) {
+}).delete(async function (req, res) {
   var user = res.locals.user
   let courseID = parseInt(req.params.id)
 
-  userModel.update({
-    _id: user._id
-  }, {
-    $pull: {
-      favoriteCourses: courseID,
-      clashDetectionCourses: courseID
-    }
-  }, function (err) {
-    if (err) {
-      res.sendStatus(500)
-      return
-    }
-    res.sendStatus(200).json
-  })
+  try {
+    await userModel.updateOne({
+      _id: user._id
+    }, {
+      $pull: {
+        favoriteCourses: courseID,
+        clashDetectionCourses: courseID
+      }
+    })
+    res.sendStatus(200)
+  } catch (err) {
+    res.sendStatus(500)
+  }
 })
 
 // Respond to a request for a list of this user's favorite courses
-router.get('/', function (req, res) {
-  res.locals.user.populate('favoriteCourses', function (err, user) {
-    if (err) {
-      console.log(err)
-      res.sendStatus(500)
-    } else {
-      res.set('Cache-Control', 'no-cache')
-      if (typeof (user.favoriteCourses) !== 'undefined') {
-        let favoriteCourses = user.favoriteCourses
+router.get('/', async function (req, res) {
+  try {
+    var user = await res.locals.user.populate('favoriteCourses')
+    res.set('Cache-Control', 'no-cache')
+    if (typeof (user.favoriteCourses) !== 'undefined') {
+      let favoriteCourses = user.favoriteCourses
 
-        // Insert into favoriteCourses each course's clashDetectionPin status
-        if (typeof (user.clashDetectionCourses) !== 'undefined') {
-          // Transform the courses into regular JavaScript objects
-          favoriteCourses = user.favoriteCourses.map(function (course) {
-            return course.toObject()
-          })
+      // Insert into favoriteCourses each course's clashDetectionPin status
+      if (typeof (user.clashDetectionCourses) !== 'undefined') {
+        // Transform the courses into regular JavaScript objects
+        favoriteCourses = user.favoriteCourses.map(function (course) {
+          return course.toObject()
+        })
 
-          // Extract from favoriteCourses the hydrated favoriteCourses that are on the user's clashDetectionCourses list
-          let clashDetectionCoursesPopulated = favoriteCourses.filter(function (course) {
-            return user.clashDetectionCourses.includes(course._id)
-          })
+        // Extract from favoriteCourses the hydrated favoriteCourses that are on the user's clashDetectionCourses list
+        let clashDetectionCoursesPopulated = favoriteCourses.filter(function (course) {
+          return user.clashDetectionCourses.includes(course._id)
+        })
 
-          // Determine which (if any) of the favoriteCourses that are not on the clashDetectionCourses list clash with the courses on the clashDetectionCourses list
-          let detectClashesResult = courseClashDetector.detectCourseClash(clashDetectionCoursesPopulated, favoriteCourses, semesters[0]._id)
-          if (detectClashesResult.hasOwnProperty('status') && detectClashesResult.status === 'success') {
-            favoriteCourses = detectClashesResult.courses
-          }
-
-          // Insert into each clashDetectionCourses course clashDetectionStatus = true
-          favoriteCourses = favoriteCourses.map(function (course) {
-            course.clashDetectionStatus = user.clashDetectionCourses.includes(course._id)
-            return course
-          })
+        // Determine which (if any) of the favoriteCourses that are not on the clashDetectionCourses list clash with the courses on the clashDetectionCourses list
+        let detectClashesResult = courseClashDetector.detectCourseClash(clashDetectionCoursesPopulated, favoriteCourses, semesters[0]._id)
+        if (detectClashesResult.hasOwnProperty('status') && detectClashesResult.status === 'success') {
+          favoriteCourses = detectClashesResult.courses
         }
-        res.status(200).json(favoriteCourses)
-      } else {
-        res.status(200).json([])
+
+        // Insert into each clashDetectionCourses course clashDetectionStatus = true
+        favoriteCourses = favoriteCourses.map(function (course) {
+          course.clashDetectionStatus = user.clashDetectionCourses.includes(course._id)
+          return course
+        })
       }
+      res.status(200).json(favoriteCourses)
+    } else {
+      res.status(200).json([])
     }
-  })
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
 })
 
 // Handle requests to vote on an evaluation
-router.route('/:id/vote').all(function (req, res, next) {
+router.route('/:id/vote').all(async function (req, res, next) {
   if (typeof (req.params.id) === 'undefined') {
     res.sendStatus(400)
     return
@@ -158,27 +156,22 @@ router.route('/:id/vote').all(function (req, res, next) {
 
   console.log('Received request to /evaluations/:id/vote')
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err) {
-      console.log(err)
-      res.sendStatus(500)
-      return
-    }
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
     if (evaluation === null) {
       res.sendStatus(404)
       return
     }
     next()
-  })
-}).put(function (req, res) {
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
+}).put(async function (req, res) {
   let user = res.locals.user
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err) {
-      console.log(err)
-      res.sendStatus(500)
-      return
-    }
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
 
     // Ensure the user has not already voted on this comment
     if (typeof (evaluation.voters) !== 'undefined' && evaluation.voters.indexOf(user._id) > -1) {
@@ -187,30 +180,28 @@ router.route('/:id/vote').all(function (req, res, next) {
     }
 
     // Update the evaluation (increment the number of votes and add the user's netID to the list of voters)
-    evaluationModel.findByIdAndUpdate(req.params.id, {
+    await evaluationModel.findByIdAndUpdate(req.params.id, {
       $inc: {
         votes: 1
       },
       $addToSet: {
         voters: user._id
       }
-    }, function (err) {
-      if (err) {
-        console.log(err)
-        res.sendStatus(500)
-        return
-      }
-
-      // Return success to the client
-      res.sendStatus(200)
     })
-  })
-}).delete(function (req, res) {
+
+    // Return success to the client
+    res.sendStatus(200)
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
+}).delete(async function (req, res) {
   let user = res.locals.user
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err || typeof (evaluation.voters) === 'undefined') {
-      console.log(err)
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
+
+    if (typeof (evaluation.voters) === 'undefined') {
       res.sendStatus(500)
       return
     }
@@ -221,25 +212,22 @@ router.route('/:id/vote').all(function (req, res, next) {
       return
     }
 
-    // Update the evaluation (increment the number of votes and add the user's netID to the list of voters)
-    evaluationModel.findByIdAndUpdate(req.params.id, {
+    // Update the evaluation (decrement the number of votes and remove the user's netID from the list of voters)
+    await evaluationModel.findByIdAndUpdate(req.params.id, {
       $inc: {
         votes: -1
       },
       $pull: {
         voters: user._id
       }
-    }, function (err) {
-      if (err) {
-        console.log(err)
-        res.sendStatus(500)
-        return
-      }
-
-      // Return success to the client
-      res.sendStatus(200)
     })
-  })
+
+    // Return success to the client
+    res.sendStatus(200)
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
 })
 
 module.exports = router

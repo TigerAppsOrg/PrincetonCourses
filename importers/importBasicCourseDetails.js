@@ -7,9 +7,7 @@ require('dotenv').config()
 // Load external dependencies
 const log = require('loglevel')
 const cheerio = require('cheerio')
-const request = require('request')
-const spawn = require("child_process").spawn;
-const throttledRequest = require("throttled-request")(request);
+const spawn = require('child_process').spawn
 
 // Set the level of the logger to the first command line argument
 // Valid values: "trace", "debug", "info", "warn", "error"
@@ -49,39 +47,56 @@ const assignmentPropertyNames = Object.keys(assignmentMapping)
 // This is how we keep track of the token that is required for accessing api.princeton.edu
 let registrarFrontEndAPIToken
 
-// This will throttle web requests so no more than 5 are made every second
-throttledRequest.configure({
-  requests: 5,
-  milliseconds: 1000
-})
+// Simple throttle: allows at most `maxRequests` concurrent fetches
+const createThrottle = function (maxRequests) {
+  let active = 0
+  const queue = []
+  const next = function () {
+    if (queue.length === 0 || active >= maxRequests) return
+    active++
+    const { url, options, resolve, reject } = queue.shift()
+    fetch(url, options).then(resolve).catch(reject).finally(function () {
+      active--
+      next()
+    })
+  }
+  return function throttledFetch (url, options) {
+    return new Promise(function (resolve, reject) {
+      queue.push({ url, options, resolve, reject })
+      next()
+    })
+  }
+}
+
+const throttledFetch = createThrottle(5)
 
 // A function that takes a query string for the OIT's Course Offerings API and return to the
 // external callback junction a JSON object of the response data.
 // For example, the query "term=1174&subject=COS" will return all COS courses in
 // the Spring 2017 semester. Learn about valid query strings at https://webfeeds.princeton.edu/#feed,19
 var loadCoursesFromRegistrar = function (query, externalCallback) {
-  console.log("Preparing to make request to MobileApp API for course listings data");
+  console.log('Preparing to make request to MobileApp API for course listings data')
 
-  let args = ["importers/mobileapp.py", "importBasicCourseDetails"];
+  let args = ['importers/mobileapp.py', 'importBasicCourseDetails']
   if (query.length > 0) {
-      args.push(query);
+    args.push(query)
   }
-  const pythonMobileAppManager = spawn("python", args);
-  res = "";
-  pythonMobileAppManager.stdout.on("data", (data) => {
-      res += data.toString("utf8");
-  });
-  pythonMobileAppManager.stdout.on("end", () => {
-      externalCallback(JSON.parse(res));
-  });
-  pythonMobileAppManager.on("error", (error) => {
-      console.log(error);
-  });
+  const pythonMobileAppManager = spawn('python', args)
+  var res = ''
+  pythonMobileAppManager.stdout.on('data', function (data) {
+    res += data.toString('utf8')
+  })
+  pythonMobileAppManager.stdout.on('end', function () {
+    externalCallback(JSON.parse(res))
+  })
+  pythonMobileAppManager.on('error', function (error) {
+    console.log(error)
+  })
 }
 
 var importDataFromRegistrar = function (data) {
   console.log('Processing data recieved from MobileApp API.')
-  data.term[0].code = Number(data.term[0].code);
+  data.term[0].code = Number(data.term[0].code)
 
   for (var termIndex in data.term) {
     var term = data.term[termIndex]
@@ -90,42 +105,38 @@ var importDataFromRegistrar = function (data) {
 }
 
 // Recieve a "term" of data (of the kind produced by MobileApp API) and add/update the database to contain this data
-var importTerm = function (term) {
+var importTerm = async function (term) {
   console.log('Processing the %s semester.', term.cal_name)
 
-  // Update/Add Semesters to the database
-  // Existing semesters not in data object will be untouched
-  // Existing semesters in data object will be updated
-  // New semesters in data object will be created
-  semesterModel.findOneAndUpdate({
-    _id: term.code
-  }, {
-    _id: term.code,
-    name: term.cal_name,
-    start_date: term.start_date,
-    end_date: term.end_date
-  }, {
-    new: true,
-    upsert: true,
-    runValidators: true,
-    setDefaultsOnInsert: true
-  }, function (error, semester) {
-    if (error) {
-      log.warn('Creating or updating the semester %s failed.', term.cal_name)
-    }
+  try {
+    var semester = await semesterModel.findOneAndUpdate({
+      _id: term.code
+    }, {
+      _id: term.code,
+      name: term.cal_name,
+      start_date: term.start_date,
+      end_date: term.end_date
+    }, {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true
+    })
     log.trace('Creating or updating the semester %s succeeded.', term.cal_name)
 
     // Process each subject within this semester
     for (var subjectIndex in term.subjects) {
       var subject = term.subjects[subjectIndex]
-      importSubject(semester, subject)
+      await importSubject(semester, subject)
     }
-  })
+  } catch (error) {
+    log.warn('Creating or updating the semester %s failed.', term.cal_name)
+  }
 }
 
 // Decode escaped HTML characters in a string, for example changing "Foo&amp;bar" to "Foo&bar"
 var decodeEscapedCharacters = function (html) {
-  return cheerio('<div>' + cheerio('<div>' + html + '</div>').text() + '</div>').text()
+  return cheerio.load('<div>' + cheerio.load('<div>' + html + '</div>').text() + '</div>').text()
 }
 
 var importSubject = async function (semester, subject) {
@@ -134,9 +145,6 @@ var importSubject = async function (semester, subject) {
   // Iterate over the courses in this subject
   for (var courseIndex in subject.courses) {
     const courseData = subject.courses[courseIndex]
-
-    // Print the catalog number
-    //console.log('\t' + courseData.catalog_number)
 
     if (typeof (courseData.catalog_number) === 'undefined' || courseData.catalog_number.length < 2) {
       continue
@@ -152,169 +160,150 @@ var importSubject = async function (semester, subject) {
       courseData.detail.description = decodeEscapedCharacters(courseData.detail.description)
     }
 
-    const requestOptions = {
-      url: `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`,
-      headers: {
-        Pragma: 'no-cache',
-        Accept: 'application/json',
-        Authorization: `Bearer ${registrarFrontEndAPIToken}`,
-        'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
-      }
+    const requestUrl = `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`
+    const requestHeaders = {
+      Pragma: 'no-cache',
+      Accept: 'application/json',
+      Authorization: `Bearer ${registrarFrontEndAPIToken}`,
+      'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
     }
 
     // Increment the number of courses pending processing
     coursesPendingProcessing++
 
-    throttledRequest(requestOptions, function (error, response, body) {
-      if (error) {
-        coursesPendingProcessing--
-        return console.log(error)
+    try {
+      var response = await throttledFetch(requestUrl, { headers: requestHeaders })
+    } catch (error) {
+      coursesPendingProcessing--
+      console.log(error)
+      continue
+    }
+
+    console.log(`Got results for ${courseData.course_id}`)
+
+    // Ensure valid response shape from registrar API
+    if (!response || response.status !== 200) {
+      console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.status}`)
+      coursesPendingProcessing--
+      continue
+    }
+
+    let parsed
+    try {
+      parsed = await response.json()
+    } catch (e) {
+      console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
+      coursesPendingProcessing--
+      continue
+    }
+
+    const detailsRoot = parsed && parsed.course_details
+    const detailsArr = detailsRoot && detailsRoot.course_detail
+    if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
+      console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
+      coursesPendingProcessing--
+      continue
+    }
+
+    let frontEndApiCourseDetails = detailsArr[0]
+
+    // Grading Basis
+    switch (frontEndApiCourseDetails.grading_basis) {
+      case 'FUL': // Graded A-F, P/D/F, Audit
+        courseData.pdf = { required: false, permitted: true }
+        courseData.audit = true
+        break
+      case 'NAU': // No Audit
+        courseData.pdf = { required: false, permitted: true }
+        courseData.audit = false
+        break
+      case 'GRD': // na, npdf
+        courseData.pdf = { required: false, permitted: false }
+        courseData.audit = false
+        break
+      case 'NPD': // No Pass/D/Fail
+        courseData.pdf = { required: false, permitted: false }
+        courseData.audit = true
+        break
+      case 'PDF': // P/D/F Only
+        courseData.pdf = { required: true, permitted: true }
+        courseData.audit = true
+        break
+      default:
+        courseData.pdf = { required: false, permitted: true }
+        courseData.audit = true
+    }
+
+    // Get Grading
+    courseData.grading = Object.keys(frontEndApiCourseDetails).filter(function (key) {
+      return assignmentPropertyNames.includes(key)
+    }).filter(function (key) {
+      return frontEndApiCourseDetails[key] !== '0'
+    }).map(function (key) {
+      return {
+        component: assignmentMapping[key],
+        weight: parseFloat(frontEndApiCourseDetails[key])
       }
-      console.log(`Got results for ${courseData.course_id}`)
-
-      // Ensure valid response shape from registrar API
-      if (!response || response.statusCode !== 200) {
-        console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.statusCode}`)
-        coursesPendingProcessing--
-        return
-      }
-
-      let parsed
-      try {
-        parsed = JSON.parse(body)
-      } catch (e) {
-        console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
-        coursesPendingProcessing--
-        return
-      }
-
-      const detailsRoot = parsed && parsed.course_details
-      const detailsArr = detailsRoot && detailsRoot.course_detail
-      if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
-        console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
-        coursesPendingProcessing--
-        return
-      }
-
-      let frontEndApiCourseDetails = detailsArr[0]
-
-      // Grading Basis
-      switch (frontEndApiCourseDetails.grading_basis) {
-        case 'FUL': // Graded A-F, P/D/F, Audit
-          courseData.pdf = {
-            required: false,
-            permitted: true
-          }
-          courseData.audit = true
-          break
-        case 'NAU': // No Audit
-          courseData.pdf = {
-            required: false,
-            permitted: true
-          }
-          courseData.audit = false
-          break
-        case 'GRD': // na, npdf
-          courseData.pdf = {
-            required: false,
-            permitted: false
-          }
-          courseData.audit = false
-          break
-        case 'NPD': // No Pass/D/Fail
-          courseData.pdf = {
-            required: false,
-            permitted: false
-          }
-          courseData.audit = true
-          break
-        case 'PDF': // P/D/F Only
-          courseData.pdf = {
-            required: true,
-            permitted: true
-          }
-          courseData.audit = true
-          break
-        default:
-          courseData.pdf = {
-            required: false,
-            permitted: true
-          }
-          courseData.audit = true
-      }
-
-      // Get Grading
-      courseData.grading = Object.keys(frontEndApiCourseDetails).filter(key => assignmentPropertyNames.includes(key)).filter(key => frontEndApiCourseDetails[key] !== '0').map(function (key) {
-        return {
-          component: assignmentMapping[key],
-          weight: parseFloat(frontEndApiCourseDetails[key])
-        }
-      }).sort(function (a, b) {
-        if (a.weight < b.weight) {
-          return 1
-        }
-        if (a.weight > b.weight) {
-          return -1
-        }
-        return 0
-      })
-
-      // Get assignments description
-      if (frontEndApiCourseDetails.reading_writing_assignment && frontEndApiCourseDetails.reading_writing_assignment.trim().length > 0) {
-        courseData.assignments = frontEndApiCourseDetails.reading_writing_assignment.trim()
-      }
-
-      // Get reserved seats
-      if (frontEndApiCourseDetails.seat_reservations.seat_reservation) {
-        courseData.reservedSeats = frontEndApiCourseDetails.seat_reservations.seat_reservation.map(reservation => `${reservation.description} ${reservation.enrl_cap}`)
-      }
-
-      // Get reading list
-      let readingList = []
-      for (let i = 1; i <= 6; i++) {
-        let title = frontEndApiCourseDetails[`reading_list_title_${i}`]
-        if (title && title.trim().length > 0) {
-          let reading = {
-            title: title.trim()
-          }
-
-          let author = frontEndApiCourseDetails[`reading_list_author_${i}`]
-          if (author && author.trim().length > 0) {
-            reading.author = author.trim()
-          }
-          readingList.push(reading)
-        }
-      }
-      if (readingList.length > 0) {
-        courseData.readingList = readingList
-      }
-
-      // Get prerequisites and restrictions
-      courseData.prerequisites = frontEndApiCourseDetails.other_restrictions
-
-      // Get other information
-      courseData.otherinformation = frontEndApiCourseDetails.other_information
-
-      // Get other information
-      courseData.otherrequirements = frontEndApiCourseDetails.other_requirements
-
-      // Get other information
-      courseData.website = frontEndApiCourseDetails.web_address
-
-      // Get distribution requirements
-      courseData.distribution_area = frontEndApiCourseDetails.distribution_area_short
-
-      courseModel.createCourse(semester, subject.code, courseData, function () {
-        // Decrement the number of courses pending processing
-        coursesPendingProcessing--
-
-        // If there are no courses pending processing, we should quit
-        if (coursesPendingProcessing === 0) {
-          console.log('All courses successfully processed.')
-          process.exit()
-        }
-      })
+    }).sort(function (a, b) {
+      if (a.weight < b.weight) return 1
+      if (a.weight > b.weight) return -1
+      return 0
     })
+
+    // Get assignments description
+    if (frontEndApiCourseDetails.reading_writing_assignment && frontEndApiCourseDetails.reading_writing_assignment.trim().length > 0) {
+      courseData.assignments = frontEndApiCourseDetails.reading_writing_assignment.trim()
+    }
+
+    // Get reserved seats
+    if (frontEndApiCourseDetails.seat_reservations.seat_reservation) {
+      courseData.reservedSeats = frontEndApiCourseDetails.seat_reservations.seat_reservation.map(function (reservation) {
+        return `${reservation.description} ${reservation.enrl_cap}`
+      })
+    }
+
+    // Get reading list
+    let readingList = []
+    for (let i = 1; i <= 6; i++) {
+      let title = frontEndApiCourseDetails[`reading_list_title_${i}`]
+      if (title && title.trim().length > 0) {
+        let reading = { title: title.trim() }
+        let author = frontEndApiCourseDetails[`reading_list_author_${i}`]
+        if (author && author.trim().length > 0) {
+          reading.author = author.trim()
+        }
+        readingList.push(reading)
+      }
+    }
+    if (readingList.length > 0) {
+      courseData.readingList = readingList
+    }
+
+    // Get prerequisites and restrictions
+    courseData.prerequisites = frontEndApiCourseDetails.other_restrictions
+
+    // Get other information
+    courseData.otherinformation = frontEndApiCourseDetails.other_information
+
+    // Get other requirements
+    courseData.otherrequirements = frontEndApiCourseDetails.other_requirements
+
+    // Get website
+    courseData.website = frontEndApiCourseDetails.web_address
+
+    // Get distribution requirements
+    courseData.distribution_area = frontEndApiCourseDetails.distribution_area_short
+
+    await courseModel.createCourse(semester, subject.code, courseData)
+
+    // Decrement the number of courses pending processing
+    coursesPendingProcessing--
+
+    // If there are no courses pending processing, we should quit
+    if (coursesPendingProcessing === 0) {
+      console.log('All courses successfully processed.')
+      process.exit()
+    }
   }
 }
 
@@ -322,67 +311,59 @@ var importSubject = async function (semester, subject) {
 var coursesPendingProcessing = 0
 
 // Get queryString from command line args
-var queryString = "";
+var queryString = ''
 if (process.argv.length > 2) {
   queryString = process.argv[2]
 }
 
-const getRegistrarFrontEndAPIToken = function (callback) {
+const getRegistrarFrontEndAPIToken = async function () {
   if (process.env.REGISTRAR_FE_API_TOKEN && process.env.REGISTRAR_FE_API_TOKEN.trim().length > 0) {
-    return callback(null, process.env.REGISTRAR_FE_API_TOKEN.trim())
+    return process.env.REGISTRAR_FE_API_TOKEN.trim()
   }
-  request('https://registrar.princeton.edu/course-offerings', function (error, response, body) {
-    if (error) {
-      return callback(error)
-    }
+  var response = await fetch('https://registrar.princeton.edu/course-offerings')
+  var body = await response.text()
+  const $ = cheerio.load(body)
+  let tokenText = ''
+  const el = $('[data-drupal-selector="drupal-settings-json"]')
+  if (el && el.length > 0) {
+    tokenText = el.text() || ''
+  }
+  let token = ''
+  if (tokenText && tokenText.trim().length > 0) {
     try {
-      const $ = cheerio.load(body)
-      let tokenText = ''
-      const el = $('[data-drupal-selector="drupal-settings-json"]')
-      if (el && el.length > 0) {
-        tokenText = el.text() || ''
+      const obj = JSON.parse(tokenText)
+      if (obj && obj.ps_registrar && obj.ps_registrar.apiToken) {
+        token = obj.ps_registrar.apiToken
       }
-      let token = ''
-      if (tokenText && tokenText.trim().length > 0) {
-        try {
-          const obj = JSON.parse(tokenText)
-          if (obj && obj.ps_registrar && obj.ps_registrar.apiToken) {
-            token = obj.ps_registrar.apiToken
-          }
-        } catch (e) {
-          // fallthrough to regex scan
-        }
-      }
-      if (!token) {
-        // Attempt regex search through all scripts as a fallback
-        $('script').each((i, s) => {
-          if (token) return
-          const txt = $(s).html() || ''
-          const m = txt.match(/\"apiToken\"\s*:\s*\"([^\"]+)\"/)
-          if (m && m[1]) {
-            token = m[1]
-          }
-        })
-      }
-      if (!token) {
-        return callback(new Error('Could not locate registrar front-end API token in course-offerings page. Set REGISTRAR_FE_API_TOKEN to override.'))
-      }
-      callback(null, token)
     } catch (e) {
-      callback(e)
+      // fallthrough to regex scan
     }
-  })
+  }
+  if (!token) {
+    // Attempt regex search through all scripts as a fallback
+    $('script').each(function (i, s) {
+      if (token) return
+      const txt = $(s).html() || ''
+      const m = txt.match(/"apiToken"\s*:\s*"([^"]+)"/)
+      if (m && m[1]) {
+        token = m[1]
+      }
+    })
+  }
+  if (!token) {
+    throw new Error('Could not locate registrar front-end API token in course-offerings page. Set REGISTRAR_FE_API_TOKEN to override.')
+  }
+  return token
 }
 
 console.log("Acquiring API token for the registrar's website front-end API")
-getRegistrarFrontEndAPIToken(function (error, apiToken) {
-  if (error) {
-    console.log('Failed getting registrarFrontEndAPIToken')
-    console.log(error)
-    process.exit(1)
-  }
+getRegistrarFrontEndAPIToken().then(function (apiToken) {
   console.log('Got registrarFrontEndAPIToken')
   registrarFrontEndAPIToken = apiToken
   // Only start loading courses after token is available to avoid undefined header usage
   loadCoursesFromRegistrar(queryString, importDataFromRegistrar)
+}).catch(function (error) {
+  console.log('Failed getting registrarFrontEndAPIToken')
+  console.log(error)
+  process.exit(1)
 })
