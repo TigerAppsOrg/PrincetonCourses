@@ -1,5 +1,5 @@
-/* 
-TODO: 
+/*
+TODO:
 - The new place to parse is: https://registrarapps.princeton.edu/course-evaluation?courseinfo=002099&terminfo=1212
 - In dev console, go to 'Application'->'Storage'->'Cookies'->'PHPSESSID' for the new session cookie to paste
 - console.log(comments) outputs the course evaluation result NUMBERS and the term comparison NUMBERS
@@ -11,7 +11,6 @@ TODO:
 
 // Load external dependencies
 const cheerio = require('cheerio')
-const request = require('request')
 const promptly = require('promptly')
 require('colors')
 
@@ -27,28 +26,20 @@ let sessionCookie
 let courses
 
 // Load a request from the server and call the function externalCallback
-const loadPage = function (term, courseID, callback) {
-  // Define the HTTP request options
-  const options = {
-    url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
-    // url: 'https://reg-captiva.princeton.edu/chart/index.php?terminfo=' + term + '&courseinfo=' + courseID,
+const loadPage = async function (term, courseID) {
+  const url = 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID
+  var response = await fetch(url, {
     headers: {
-      'Cookie': `PHPSESSID=${sessionCookie};`,
+      Cookie: `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
     }
-  }
-
-  request(options, (err, response, body) => {
-    if (err) {
-      return console.error(err)
-    }
-    callback(body)
   })
+  return response.text()
 }
 
 // Return the course evaluation data for the given semester/courseID to the function callback
 const getCourseEvaluationData = function (semester, courseID, externalCallback) {
-  loadPage(semester, courseID, function (data) {
+  loadPage(semester, courseID).then(function (data) {
     const $ = cheerio.load(data)
     if ($('title').text() !== 'Course Evaluation Results') {
       console.error('Scraping the evaluations failed. Your session cookie was probably bad. You must provide a valid session cookie.')
@@ -57,22 +48,17 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     }
 
     console.log('\tRecieved data for course %s in semester %s.', courseID, semester)
-    console.log("\textra line");
-    // console.log(data);
-    // If this course is in the current semester, then the Registrar's page defaults back to the most recent semester for which course evaluations exist. This checks that we have indeed scraped the evaluations for the correct semester.
-    // if ($("td[bgcolor=Gainsboro] a[href*='terminfo=" + semester + "']").length !== 1) {
-    //   externalCallback({}, [])
-    //   return
-    // }
-    console.log("\tsecond line");
+    console.log('\textra line')
+
+    console.log('\tsecond line')
     // Get Chart Data
     const b64EncodedChartData = $('#chart_settings').attr('value')
     const scores = {}
     if (b64EncodedChartData) {
       const chartData = Buffer.from(b64EncodedChartData, 'base64').toString('ascii')
       const chart = JSON.parse(chartData)
-      console.log("\tChart");
-      console.log(chart);
+      console.log('\tChart')
+      console.log(chart)
       // Extract Numerical Evaluation Data from Chart
       const xItems = chart.PlotArea.XAxis.Items
       const yItems = chart.PlotArea.ListOfSeries[0].Items
@@ -86,10 +72,9 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     $('table:last-child tr:not(:first-child) td').each(function (index, element) {
       comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
     })
-    // console.log(courseID);
-    // console.log(scores);
-    // console.log(comments);
     externalCallback(scores, comments)
+  }).catch(function (err) {
+    console.error(err)
   })
 }
 
@@ -106,155 +91,155 @@ console.log(instructions[0])
 require('../controllers/database.js')
 
 const departments = {
-  AAS: "African American Studies",
-  AFS: "African Studies",
-  AMS: "American Studies",
-  ANT: "Anthropology",
-  AOS: "Atmospheric & Oceanic Sciences",
-  APC: "Appl and Computational Math",
-  ARA: "Arabic",
-  ARC: "Architecture",
-  ART: "Art and Archaeology",
-  AST: "Astrophysical Sciences",
-  ATL: "Atelier",
-  BCS: "Bosnian-Croatian-Serbian",
-  CBE: "Chemical and Biological Engr",
-  CEE: "Civil and Environmental Engr",
-  CGS: "Cognitive Science",
-  CHI: "Chinese",
-  CHM: "Chemistry",
-  CHV: "Center for Human Values",
-  CLA: "Classics",
-  CLG: "Classical Greek",
-  COM: "Comparative Literature",
-  COS: "Computer Science",
-  CTL: "Center for Teaching & Learning",
-  CWR: "Creative Writing",
-  CZE: "Czech",
-  DAN: "Dance",
-  EAS: "East Asian Studies",
-  ECO: "Economics",
-  ECS: "European Cultural Studies",
-  EEB: "Ecology and Evol Biology",
-  EGR: "Engineering",
-  ELE: "Electrical Engineering",
-  ENE: "Energy Studies",
-  ENG: "English",
-  ENT: "Entrepreneurship",
-  ENV: "Environmental Studies",
-  EPS: "Contemporary European Politics",
-  FIN: "Finance",
-  FRE: "French",
-  FRS: "Freshman Seminars",
-  GEO: "Geosciences",
-  GER: "German",
-  GHP: "Global Health & Health Policy",
-  GLS: "Global Seminar",
-  GSS: "Gender and Sexuality Studies",
-  HEB: "Hebrew",
-  HIN: "Hindi",
-  HIS: "History",
-  HLS: "Hellenic Studies",
-  HOS: "History of Science",
-  HUM: "Humanistic Studies",
-  ISC: "Integated Science Curriculum",
-  ITA: "Italian",
-  JDS: "Judaic Studies",
-  JPN: "Japanese",
-  JRN: "Journalism",
-  KOR: "Korean",
-  LAO: "Latino Studies",
-  LAS: "Latin American Studies",
-  LAT: "Latin",
-  LCA: "Lewis Center for the Arts",
-  LIN: "Linguistics",
-  MAE: "Mech and Aerospace Engr",
-  MAT: "Mathematics",
-  MED: "Medieval Studies",
-  MOD: "Media and Modernity",
-  MOG: "Modern Greek",
-  MOL: "Molecular Biology",
-  MSE: "Materials Science and Engr",
-  MTD: "Music Theater",
-  MUS: "Music",
-  NES: "Near Eastern Studies",
-  NEU: "Neuroscience",
-  ORF: "Oper Res and Financial Engr",
-  PAW: "Ancient World",
-  PER: "Persian",
-  PHI: "Philosophy",
-  PHY: "Physics",
-  PLS: "Polish",
-  POL: "Politics",
-  POP: "Population Studies",
-  POR: "Portuguese",
-  PSY: "Psychology",
-  QCB: "Quantitative Computational Bio",
-  REL: "Religion",
-  RES: "Russian, East Europ, Eurasian",
-  RUS: "Russian",
-  SAN: "Sanskrit",
-  SAS: "South Asian Studies",
-  SLA: "Slavic Languages and Lit",
-  SML: "Statistics & Machine Learning",
-  SOC: "Sociology",
-  SPA: "Spanish",
-  STC: "Science and Technology Council",
-  SWA: "Swahili",
-  THR: "Theater",
-  TPP: "Teacher Preparation",
-  TRA: "Translation, Intercultural Com",
-  TUR: "Turkish",
-  TWI: "Twi",
-  URB: "Urban Studies",
-  URD: "Urdu",
-  VIS: "Visual Arts",
-  WRI: "Princeton Writing Program",
-  WWS: "Woodrow Wilson School",
-};
+  AAS: 'African American Studies',
+  AFS: 'African Studies',
+  AMS: 'American Studies',
+  ANT: 'Anthropology',
+  AOS: 'Atmospheric & Oceanic Sciences',
+  APC: 'Appl and Computational Math',
+  ARA: 'Arabic',
+  ARC: 'Architecture',
+  ART: 'Art and Archaeology',
+  AST: 'Astrophysical Sciences',
+  ATL: 'Atelier',
+  BCS: 'Bosnian-Croatian-Serbian',
+  CBE: 'Chemical and Biological Engr',
+  CEE: 'Civil and Environmental Engr',
+  CGS: 'Cognitive Science',
+  CHI: 'Chinese',
+  CHM: 'Chemistry',
+  CHV: 'Center for Human Values',
+  CLA: 'Classics',
+  CLG: 'Classical Greek',
+  COM: 'Comparative Literature',
+  COS: 'Computer Science',
+  CTL: 'Center for Teaching & Learning',
+  CWR: 'Creative Writing',
+  CZE: 'Czech',
+  DAN: 'Dance',
+  EAS: 'East Asian Studies',
+  ECO: 'Economics',
+  ECS: 'European Cultural Studies',
+  EEB: 'Ecology and Evol Biology',
+  EGR: 'Engineering',
+  ELE: 'Electrical Engineering',
+  ENE: 'Energy Studies',
+  ENG: 'English',
+  ENT: 'Entrepreneurship',
+  ENV: 'Environmental Studies',
+  EPS: 'Contemporary European Politics',
+  FIN: 'Finance',
+  FRE: 'French',
+  FRS: 'Freshman Seminars',
+  GEO: 'Geosciences',
+  GER: 'German',
+  GHP: 'Global Health & Health Policy',
+  GLS: 'Global Seminar',
+  GSS: 'Gender and Sexuality Studies',
+  HEB: 'Hebrew',
+  HIN: 'Hindi',
+  HIS: 'History',
+  HLS: 'Hellenic Studies',
+  HOS: 'History of Science',
+  HUM: 'Humanistic Studies',
+  ISC: 'Integated Science Curriculum',
+  ITA: 'Italian',
+  JDS: 'Judaic Studies',
+  JPN: 'Japanese',
+  JRN: 'Journalism',
+  KOR: 'Korean',
+  LAO: 'Latino Studies',
+  LAS: 'Latin American Studies',
+  LAT: 'Latin',
+  LCA: 'Lewis Center for the Arts',
+  LIN: 'Linguistics',
+  MAE: 'Mech and Aerospace Engr',
+  MAT: 'Mathematics',
+  MED: 'Medieval Studies',
+  MOD: 'Media and Modernity',
+  MOG: 'Modern Greek',
+  MOL: 'Molecular Biology',
+  MSE: 'Materials Science and Engr',
+  MTD: 'Music Theater',
+  MUS: 'Music',
+  NES: 'Near Eastern Studies',
+  NEU: 'Neuroscience',
+  ORF: 'Oper Res and Financial Engr',
+  PAW: 'Ancient World',
+  PER: 'Persian',
+  PHI: 'Philosophy',
+  PHY: 'Physics',
+  PLS: 'Polish',
+  POL: 'Politics',
+  POP: 'Population Studies',
+  POR: 'Portuguese',
+  PSY: 'Psychology',
+  QCB: 'Quantitative Computational Bio',
+  REL: 'Religion',
+  RES: 'Russian, East Europ, Eurasian',
+  RUS: 'Russian',
+  SAN: 'Sanskrit',
+  SAS: 'South Asian Studies',
+  SLA: 'Slavic Languages and Lit',
+  SML: 'Statistics & Machine Learning',
+  SOC: 'Sociology',
+  SPA: 'Spanish',
+  STC: 'Science and Technology Council',
+  SWA: 'Swahili',
+  THR: 'Theater',
+  TPP: 'Teacher Preparation',
+  TRA: 'Translation, Intercultural Com',
+  TUR: 'Turkish',
+  TWI: 'Twi',
+  URB: 'Urban Studies',
+  URD: 'Urdu',
+  VIS: 'Visual Arts',
+  WRI: 'Princeton Writing Program',
+  WWS: 'Woodrow Wilson School'
+}
 promptly.prompt(
-    "Paste the session cookie output from the developer console and hit enter:"
-  )
-  .then((cookie) => {
-    sessionCookie = cookie;
+  'Paste the session cookie output from the developer console and hit enter:'
+)
+  .then(function (cookie) {
+    sessionCookie = cookie
     return promptly.prompt(
-      "Enter the department",
+      'Enter the department',
       {
-        default: "COS",
+        default: 'COS'
       }
-    );
+    )
   })
-  .then((dep) => {
+  .then(function (dep) {
     // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
-    courseModel.find({ department: dep }).then((returnedCourses) => {
-      courses = returnedCourses;
-      console.log("length:" + courses.length);
-      let coursesPendingProcessing = courses.length;
-      let courseIndex = 0;
+    courseModel.find({ department: dep }).then(function (returnedCourses) {
+      courses = returnedCourses
+      console.log('length:' + courses.length)
+      let coursesPendingProcessing = courses.length
+      let courseIndex = 0
 
       const interval = setInterval(function () {
-        const thisCourse = courses[courseIndex++];
+        const thisCourse = courses[courseIndex++]
 
         // If there are no more courses, cease sending requests
-        if (typeof thisCourse === "undefined") {
-          clearInterval(interval);
-          return;
+        if (typeof thisCourse === 'undefined') {
+          clearInterval(interval)
+          return
         }
 
         console.log(
           `Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${courseIndex} of ${courses.length}).`
-        );
+        )
 
         // Fetch the evaluation data
         getCourseEvaluationData(
           thisCourse.semester._id,
           thisCourse.courseID,
           function (scores, comments) {
-            let promises = [];
-            console.log(thisCourse.semester._id);
-            console.log(thisCourse.courseID);
-            console.log(scores);
-            console.log(comments);
+            let promises = []
+            console.log(thisCourse.semester._id)
+            console.log(thisCourse.courseID)
+            console.log(scores)
+            console.log(comments)
             // Iterate over the comments
             for (const comment of comments) {
               // Save the comments to the database
@@ -263,41 +248,41 @@ promptly.prompt(
                   .findOneAndUpdate(
                     {
                       comment: comment,
-                      course: thisCourse._id,
+                      course: thisCourse._id
                     },
                     {
                       comment: comment,
-                      course: thisCourse._id,
+                      course: thisCourse._id
                     },
                     {
                       new: true,
                       upsert: true,
                       runValidators: true,
-                      setDefaultsOnInsert: true,
+                      setDefaultsOnInsert: true
                     }
                   )
                   .exec()
-              );
+              )
             }
 
             // Update the course with the newly-fetched evaluation data
             if (scores !== {}) {
               promises.push(
-                courseModel.update(
+                courseModel.updateOne(
                   {
-                    _id: thisCourse._id,
+                    _id: thisCourse._id
                   },
                   {
                     $set: {
-                      scores: scores,
+                      scores: scores
                     },
                     $unset: {
-                      scoresFromPreviousSemester: "",
-                      scoresFromPreviousSemesterSemester: "",
-                    },
+                      scoresFromPreviousSemester: '',
+                      scoresFromPreviousSemesterSemester: ''
+                    }
                   }
                 )
-              );
+              )
             }
 
             // Wait for all database operations to complete
@@ -306,23 +291,23 @@ promptly.prompt(
                 if (coursesPendingProcessing % 10 === 0) {
                   console.log(
                     `${coursesPendingProcessing} courses still processing…`
-                  );
+                  )
                 }
                 if (--coursesPendingProcessing === 0) {
                   console.log(
-                    "Fetched and saved all the requested course evaluations."
-                  );
-                  process.exit(0);
+                    'Fetched and saved all the requested course evaluations.'
+                  )
+                  process.exit(0)
                 }
               })
               .catch(function (reason) {
-                console.log(reason);
-              });
+                console.log(reason)
+              })
           }
-        );
-      }, 500);
-      setTimeout(() => {
-        console.log("Wait");
-      }, 500 * courses.length);
-    });
+        )
+      }, 500)
+      setTimeout(function () {
+        console.log('Wait')
+      }, 500 * courses.length)
+    })
   })

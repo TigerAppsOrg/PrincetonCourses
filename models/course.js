@@ -142,7 +142,7 @@ var autoPopulate = function (next) {
   if (this && this.options && this.options._skipAutoPopulate) {
     return next()
   }
-  this.populate('instructors semester semesters')
+  this.populate('instructors semester')
   next()
 }
 
@@ -151,9 +151,7 @@ courseSchema.pre('find', autoPopulate)
 courseSchema.pre('findOne', autoPopulate)
 
 // Save a new course in the database. Data should be the course details from the Registrar
-courseSchema.statics.createCourse = function (semester, department, data, callback) {
-  var courseModel = mongoose.model('Course', courseSchema)
-
+courseSchema.statics.createCourse = async function (semester, department, data) {
   // Process the instructors for this course
   var instructors = []
   for (var instructorIndex in data.instructors) {
@@ -242,21 +240,18 @@ courseSchema.statics.createCourse = function (semester, department, data, callba
     upsertData.website = data.website.trim()
   }
 
-  courseModel.findOneAndUpdate({
-    _id: data.guid
-  }, upsertData, {
-    new: true,
-    upsert: true,
-    runValidators: true,
-    setDefaultsOnInsert: true
-  }, function (error) {
-    if (error) {
-      console.log('Creating/updating a course failed. Error: %s', error)
-    }
-    if (typeof (callback) === 'function') {
-      callback()
-    }
-  })
+  try {
+    await this.findOneAndUpdate({
+      _id: data.guid
+    }, upsertData, {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true
+    }).exec()
+  } catch (error) {
+    console.log('Creating/updating a course failed. Error: %s', error)
+  }
 }
 
 // Create the Course model from the courseSchema

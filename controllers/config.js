@@ -10,11 +10,11 @@ if (typeof (mongoDBURI) === 'undefined') {
 module.exports.mongoDBURI = mongoDBURI
 
 // The domain and port on which the app is running
-var host = process.env.HOST || 'http://localhost:5000'
+var host = process.env.HOST || 'http://localhost:5050'
 module.exports.host = host
 
 // The domain and port on which the app is running
-var port = process.env.PORT || 500
+var port = process.env.PORT || 5050
 module.exports.port = port
 
 // The secret used to encrypt session database

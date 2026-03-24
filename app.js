@@ -1,4 +1,5 @@
 // This script is the main app script that powers Princeton Courses. It runs immediately when the app launches
+require('dotenv').config()
 
 // Greet the world!
 console.log('Launching Princeton Courses.')
@@ -11,8 +12,6 @@ let mongoose = require('mongoose')
 let express = require('express')
 let session = require('cookie-session')
 
-// Make Mongoose use native promises
-mongoose.Promise = global.Promise
 
 // Initialise Express, which makes the server work
 let app = express()
@@ -124,7 +123,7 @@ app.get('*', function (req, res) {
 app.set('view engine', 'ejs')
 
 const cluster = require('cluster')
-if (cluster.isMaster) {
+if (cluster.isPrimary) {
   const os = require('os')
   const workers = process.env.WEB_CONCURRENCY || os.cpus().length || 1
 

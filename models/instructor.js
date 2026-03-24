@@ -45,9 +45,7 @@ instructorSchema.on('index', function (error) {
 })
 
 instructorSchema.statics.upsertInstructor = function (emplid, firstName, lastName) {
-  var instructorModel = mongoose.model('Instructor', instructorSchema)
-
-  instructorModel.findOneAndUpdate({
+  return this.findOneAndUpdate({
     _id: emplid
   }, {
     _id: emplid,
@@ -58,17 +56,13 @@ instructorSchema.statics.upsertInstructor = function (emplid, firstName, lastNam
   }, {
     new: true,
     upsert: true
-  }, function (error) {
-    if (error) {
-      console.log('In upsertInstructor upserting instructor failed: %s', error)
-    }
+  }).exec().catch(function (error) {
+    console.log('In upsertInstructor upserting instructor failed: %s', error)
   })
 }
 
 instructorSchema.statics.upsertInstructorWithCourse = function (emplid, firstName, lastName, courseID) {
-  var instructorModel = mongoose.model('Instructor', instructorSchema)
-
-  instructorModel.findOneAndUpdate({
+  return this.findOneAndUpdate({
     _id: emplid
   }, {
     _id: emplid,
@@ -82,10 +76,8 @@ instructorSchema.statics.upsertInstructorWithCourse = function (emplid, firstNam
   }, {
     new: true,
     upsert: true
-  }, function (error) {
-    if (error) {
-      console.log('In upsertInstructorWithCourse upserting instructor failed: %s', error)
-    }
+  }).exec().catch(function (error) {
+    console.log('In upsertInstructorWithCourse upserting instructor failed: %s', error)
   })
 }
 

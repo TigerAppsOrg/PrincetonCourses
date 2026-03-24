@@ -8,10 +8,14 @@ let router = express.Router()
 let semesterModel = require.main.require('./models/semester.js')
 
 // Respond to requests for semester listings
-router.use(function (req, res) {
-  semesterModel.getAll(function (fetchedSemesters) {
+router.use(async function (req, res) {
+  try {
+    var fetchedSemesters = await semesterModel.getAll()
     res.set('Cache-Control', 'no-cache').status(200).json(fetchedSemesters)
-  })
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
 })
 
 module.exports = router

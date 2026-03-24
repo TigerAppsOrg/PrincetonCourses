@@ -38,7 +38,7 @@ router.route('/:id').all(function (req, res, next) {
   }
 
   // Update the user's list of favorite courses
-  var updateUserPromise = userModel.update({
+  var updateUserPromise = userModel.updateOne({
     _id: user._id
   }, {
     $addToSet: {
@@ -60,22 +60,21 @@ router.route('/:id').all(function (req, res, next) {
     console.log(error)
     res.sendStatus(500)
   })
-}).delete(function (req, res) {
+}).delete(async function (req, res) {
   var user = res.locals.user
 
-  userModel.update({
-    _id: user._id
-  }, {
-    $pull: {
-      clashDetectionCourses: parseInt(req.params.id)
-    }
-  }, function (err) {
-    if (err) {
-      res.sendStatus(500)
-      return
-    }
-    res.sendStatus(200).json
-  })
+  try {
+    await userModel.updateOne({
+      _id: user._id
+    }, {
+      $pull: {
+        clashDetectionCourses: parseInt(req.params.id)
+      }
+    })
+    res.sendStatus(200)
+  } catch (err) {
+    res.sendStatus(500)
+  }
 })
 
 module.exports = router

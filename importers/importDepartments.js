@@ -5,10 +5,9 @@ console.log('Starting script to update our database with latest course listings 
 require('dotenv').config()
 
 // Load external dependencies
-var http = require('http')
 var log = require('loglevel')
-const spawn = require("child_process").spawn;
-var $ = require('cheerio')
+const spawn = require('child_process').spawn
+var cheerio = require('cheerio')
 
 // Set the level of the logger to the first command line argument
 // Valid values: "trace", "debug", "info", "warn", "error"
@@ -23,59 +22,52 @@ var departmentModel = require('../models/department.js')
 require('../controllers/database.js')
 
 let loadDepartmentsFromRegistrar = function (callback) {
-  console.log("Requesting department details from MobileApp API");
+  console.log('Requesting department details from MobileApp API')
 
-  let args = ["importers/mobileapp.py", "importDepartmentals"];
-  const pythonMobileAppManager = spawn("python", args);
-  res = "";
-  pythonMobileAppManager.stdout.on("data", (data) => {
-      res += data.toString("utf8");
-  });
-  pythonMobileAppManager.stdout.on("end", () => {
-      callback(JSON.parse(res));
-  });
-  pythonMobileAppManager.on("error", (error) => {
-      console.log(error);
-  });
+  let args = ['importers/mobileapp.py', 'importDepartmentals']
+  const pythonMobileAppManager = spawn('python', args)
+  var res = ''
+  pythonMobileAppManager.stdout.on('data', function (data) {
+    res += data.toString('utf8')
+  })
+  pythonMobileAppManager.stdout.on('end', function () {
+    callback(JSON.parse(res))
+  })
+  pythonMobileAppManager.on('error', function (error) {
+    console.log(error)
+  })
 }
 
 // Decode escaped HTML characters in a string, for example changing "Foo&amp;bar" to "Foo&bar"
 let decodeEscapedCharacters = function (html) {
-  return $('<div>' + $('<div>' + html + '</div>').text() + '</div>').text()
+  return cheerio.load('<div>' + cheerio.load('<div>' + html + '</div>').text() + '</div>').text()
 }
 
-let handleData = function (data) {
-  // Keep track of the number of subjects pending being saved to the database
-  let pendingSubjects = 0
-
+let handleData = async function (data) {
   // Iterate over each semester and subject to save to the database
-  data.term.forEach(function (semester) {
+  for (const semester of data.term) {
     if (typeof (semester.subjects) !== 'undefined') {
-      pendingSubjects += semester.subjects.length
-      semester.subjects.forEach(function (subject) {
-        departmentModel.findOneAndUpdate({
-          _id: subject.code
-        }, {
-          _id: subject.code,
-          name: decodeEscapedCharacters(subject.name)
-        }, {
-          new: true,
-          upsert: true,
-          runValidators: true
-        }, function (error, semester) {
-          if (error) {
-            console.log('Creating or updating the subject %s failed.', subject.code)
-          } else {
-            console.log('Creating or updating the subject %s succeeded.', subject.code)
-          }
-          if (--pendingSubjects === 0) {
-            console.log('Importing subjects complete.')
-            process.exit(0)
-          }
-        })
-      })
+      for (const subject of semester.subjects) {
+        try {
+          await departmentModel.findOneAndUpdate({
+            _id: subject.code
+          }, {
+            _id: subject.code,
+            name: decodeEscapedCharacters(subject.name)
+          }, {
+            new: true,
+            upsert: true,
+            runValidators: true
+          })
+          console.log('Creating or updating the subject %s succeeded.', subject.code)
+        } catch (error) {
+          console.log('Creating or updating the subject %s failed.', subject.code)
+        }
+      }
     }
-  })
+  }
+  console.log('Importing subjects complete.')
+  process.exit(0)
 }
 
 loadDepartmentsFromRegistrar(handleData)

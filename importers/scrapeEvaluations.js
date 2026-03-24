@@ -3,7 +3,6 @@
 
 // Load external dependencies
 const cheerio = require('cheerio')
-const request = require('request')
 const promptly = require('promptly')
 require('colors')
 
@@ -24,30 +23,20 @@ const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '3', 10) // 
 const RETRY_BACKOFF_MS = parseInt(process.env.EVAL_SCRAPE_RETRY_BACKOFF_MS || '1000', 10) // base backoff
 
 // Load a request from the server and call the function externalCallback
-const loadPage = function (term, courseID, callback) {
-  // Define the HTTP request options
-  const options = {
-    url: 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID,
+const loadPage = async function (term, courseID) {
+  const url = 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID
+  var response = await fetch(url, {
     headers: {
-      'Cookie': `PHPSESSID=${sessionCookie};`,
+      Cookie: `PHPSESSID=${sessionCookie};`,
       'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
     }
-  }
-
-  request(options, (err, response, body) => {
-    if (err) {
-      return callback(err)
-    }
-    callback(null, body)
   })
+  return response.text()
 }
 
 // Return the course evaluation data for the given semester/courseID to the function callback
 const getCourseEvaluationData = function (semester, courseID, externalCallback) {
-  loadPage(semester, courseID, function (err, data) {
-    if (err) {
-      return externalCallback(err)
-    }
+  loadPage(semester, courseID).then(function (data) {
     const $ = cheerio.load(data)
     if ($('title').text() !== 'Course Evaluation Results') {
       console.error('Scraping the evaluations failed. Your session cookie probably expired. You must provide a valid session cookie.'.red)
@@ -60,11 +49,11 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     // Extract scores
     var scores = {}
     if ($.html().includes(semester)) {
-      var table_value = $(".data-bar-chart").attr('data-bar-chart')
+      var table_value = $('.data-bar-chart').attr('data-bar-chart')
       if (typeof table_value !== 'undefined') {
         try {
           JSON.parse(table_value).forEach(function (arrayItem) {
-            scores[arrayItem['key']] = parseFloat(arrayItem['value'])
+            scores[arrayItem.key] = parseFloat(arrayItem.value)
           })
         } catch (e) {
           // ignore parse error and continue without scores for course
@@ -75,7 +64,7 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     // Extract student comments
     const comments = []
     if ($.html().includes(semester)) {
-      var comment_values = $(".comment")
+      var comment_values = $('.comment')
       if (typeof comment_values !== 'undefined') {
         comment_values.each(function (index, element) {
           comments.push($(element).text().replace('\n', ' ').replace('\r', ' ').trim())
@@ -84,6 +73,8 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
     }
 
     externalCallback(null, scores, comments)
+  }).catch(function (err) {
+    externalCallback(err)
   })
 }
 
@@ -112,22 +103,20 @@ const getQuery = () => {
     return Promise.resolve(envQuery.trim())
   }
   return promptly.prompt('Enter the MongoDB-style query for the courses for which you want to import the evaluations ' + '(or simply press return to scrape everything)'.green + ':', {
-    default: '{}',
+    default: '{}'
   })
 }
 
-getCookie().then(cookie => {
+getCookie().then(function (cookie) {
   sessionCookie = cookie
   return getQuery()
-}).then(query => {
+}).then(function (query) {
   // Connect to the database
   require('../controllers/database.js')
 
-  // evaluationModel.deleteMany({ "comment": { $regex: "^[0-9].[0-9]$" } }).then(() => { throw new Error("Forced ending"); })
-
   // Find an array of courses and populate the courses with the course evaluation information from the Registrar. Save the data to the database
   return courseModel.find(JSON.parse(query))
-}).then(async (returnedCourses) => {
+}).then(async function (returnedCourses) {
   courses = returnedCourses
 
   // optional: randomized processing order to avoid repeating same leading set on reruns
@@ -140,9 +129,9 @@ getCookie().then(cookie => {
     }
   }
 
-  if (process.argv.length > 2 && process.argv[2] == '--skip') return true
+  if (process.argv.length > 2 && process.argv[2] === '--skip') return true
   return promptly.confirm(`You are about to request the course evaluation data for ${courses.length} courses. Are you sure you want to do this? (y/n):`)
-}).then(confirmation => {
+}).then(function (confirmation) {
   if (!confirmation) {
     console.log('Goodbye')
     return process.exit(0)
@@ -152,47 +141,49 @@ getCookie().then(cookie => {
   let processed = 0
   const failed = []
 
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+  const sleep = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms) }) }
 
-  const fetchCourse = (course) => new Promise((resolve, reject) => {
-    getCourseEvaluationData(course.semester._id, course.courseID, function (err, scores, comments) {
-      if (err) return reject(err)
+  const fetchCourse = function (course) {
+    return new Promise(function (resolve, reject) {
+      getCourseEvaluationData(course.semester._id, course.courseID, function (err, scores, comments) {
+        if (err) return reject(err)
 
-      let promises = []
-      for (const comment of comments) {
-        promises.push(evaluationModel.findOneAndUpdate({
-          comment: comment,
-          course: course._id
-        }, {
-          comment: comment,
-          course: course._id
-        }, {
-          new: true,
-          upsert: true,
-          runValidators: true,
-          setDefaultsOnInsert: true
-        }).exec())
-      }
+        let promises = []
+        for (const comment of comments) {
+          promises.push(evaluationModel.findOneAndUpdate({
+            comment: comment,
+            course: course._id
+          }, {
+            comment: comment,
+            course: course._id
+          }, {
+            new: true,
+            upsert: true,
+            runValidators: true,
+            setDefaultsOnInsert: true
+          }).exec())
+        }
 
-      if (scores && Object.keys(scores).length > 0) {
-        promises.push(courseModel.update({
-          _id: course._id
-        }, {
-          $set: {
-            scores: scores
-          },
-          $unset: {
-            scoresFromPreviousSemester: '',
-            scoresFromPreviousSemesterSemester: ''
-          }
-        }))
-      }
+        if (scores && Object.keys(scores).length > 0) {
+          promises.push(courseModel.updateOne({
+            _id: course._id
+          }, {
+            $set: {
+              scores: scores
+            },
+            $unset: {
+              scoresFromPreviousSemester: '',
+              scoresFromPreviousSemesterSemester: ''
+            }
+          }))
+        }
 
-      Promise.all(promises).then(() => resolve()).catch(reject)
+        Promise.all(promises).then(function () { resolve() }).catch(reject)
+      })
     })
-  })
+  }
 
-  const attemptCourse = async (course) => {
+  const attemptCourse = async function (course) {
     let attempt = 0
     while (attempt < MAX_RETRIES) {
       try {
@@ -211,7 +202,7 @@ getCookie().then(cookie => {
     return false
   }
 
-  const run = async () => {
+  const run = async function () {
     for (let i = 0; i < courses.length; i++) {
       const thisCourse = courses[i]
       console.log(`Processing course ${thisCourse.courseID} in semester ${thisCourse.semester._id}. (Course ${i + 1} of ${total}).`.yellow)
@@ -246,9 +237,9 @@ getCookie().then(cookie => {
   run()
 
   // delete malformatted evaluations
-  evaluationModel.deleteMany({comment: {$regex: "^[0-9]$"}})
-  evaluationModel.deleteMany({comment: "."})
-}).catch(err => {
+  evaluationModel.deleteMany({ comment: { $regex: '^[0-9]$' } })
+  evaluationModel.deleteMany({ comment: '.' })
+}).catch(function (err) {
   console.error(err)
   process.exit(1)
 })

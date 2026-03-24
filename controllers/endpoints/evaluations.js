@@ -8,33 +8,28 @@ let router = express.Router()
 let evaluationModel = require.main.require('./models/evaluation.js')
 
 // Handle requests to vote on an evaluation
-router.route('/:id/vote').all(function (req, res, next) {
+router.route('/:id/vote').all(async function (req, res, next) {
   if (typeof (req.params.id) === 'undefined') {
     res.sendStatus(400)
     return
   }
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err) {
-      console.log(err)
-      res.sendStatus(500)
-      return
-    }
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
     if (evaluation === null) {
       res.sendStatus(404)
       return
     }
     next()
-  })
-}).put(function (req, res) {
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
+}).put(async function (req, res) {
   let user = res.locals.user
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err) {
-      console.log(err)
-      res.sendStatus(500)
-      return
-    }
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
 
     // Ensure the user has not already voted on this comment
     if (typeof (evaluation.voters) !== 'undefined' && evaluation.voters.indexOf(user._id) > -1) {
@@ -43,30 +38,28 @@ router.route('/:id/vote').all(function (req, res, next) {
     }
 
     // Update the evaluation (increment the number of votes and add the user's netID to the list of voters)
-    evaluationModel.findByIdAndUpdate(req.params.id, {
+    await evaluationModel.findByIdAndUpdate(req.params.id, {
       $inc: {
         votes: 1
       },
       $addToSet: {
         voters: user._id
       }
-    }, function (err) {
-      if (err) {
-        console.log(err)
-        res.sendStatus(500)
-        return
-      }
-
-      // Return success to the client
-      res.sendStatus(200)
     })
-  })
-}).delete(function (req, res) {
+
+    // Return success to the client
+    res.sendStatus(200)
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
+}).delete(async function (req, res) {
   let user = res.locals.user
 
-  evaluationModel.findById(req.params.id).exec(function (err, evaluation) {
-    if (err || typeof (evaluation.voters) === 'undefined') {
-      console.log(err)
+  try {
+    var evaluation = await evaluationModel.findById(req.params.id).exec()
+
+    if (typeof (evaluation.voters) === 'undefined') {
       res.sendStatus(500)
       return
     }
@@ -77,25 +70,22 @@ router.route('/:id/vote').all(function (req, res, next) {
       return
     }
 
-    // Update the evaluation (increment the number of votes and add the user's netID to the list of voters)
-    evaluationModel.findByIdAndUpdate(req.params.id, {
+    // Update the evaluation (decrement the number of votes and remove the user's netID from the list of voters)
+    await evaluationModel.findByIdAndUpdate(req.params.id, {
       $inc: {
         votes: -1
       },
       $pull: {
         voters: user._id
       }
-    }, function (err) {
-      if (err) {
-        console.log(err)
-        res.sendStatus(500)
-        return
-      }
-
-      // Return success to the client
-      res.sendStatus(200)
     })
-  })
+
+    // Return success to the client
+    res.sendStatus(200)
+  } catch (err) {
+    console.log(err)
+    res.sendStatus(500)
+  }
 })
 
 module.exports = router
