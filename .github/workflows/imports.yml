@@ -235,6 +235,8 @@ jobs:
           EVAL_SCRAPE_DELAY_MS: "600"
           EVAL_SCRAPE_MAX_RETRIES: "5"
           EVAL_SCRAPE_RETRY_BACKOFF_MS: "1000"
+          EVAL_SCRAPE_REQUEST_TIMEOUT_MS: "30000"
+          EVAL_SCRAPE_TRANSPORT: "curl"
           EVAL_RANDOMIZE_ORDER: "true"
           PHPSESSID: ${{ inputs.php_sessid }}
           EVAL_QUERY: ${{ steps.eval_query.outputs.query }}

@@ -15,6 +15,7 @@ The workflow is the usual production path because it loads the required secrets 
 - The evaluations workflow can now do either:
   - a targeted scrape of courses whose scores are missing or backfilled
   - a full-term scrape of every course in the selected term/subject if `Run full-term eval scrape` is checked
+- The GitHub Actions eval job uses `curl` transport intentionally, because the GitHub-hosted runner was timing out on Node-based requests to the registrar even when the same cookie and URLs worked locally and on Heroku.
 
 ## Minimal Workflow: Import New Semester Courses
 

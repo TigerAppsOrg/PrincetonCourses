@@ -3,6 +3,7 @@
 
 // Load external dependencies
 const cheerio = require('cheerio')
+const { execFile } = require('child_process')
 const https = require('https')
 const promptly = require('promptly')
 require('colors')
@@ -23,6 +24,31 @@ const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '600', 10) // dela
 const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '5', 10) // per-course retries on transient errors
 const RETRY_BACKOFF_MS = parseInt(process.env.EVAL_SCRAPE_RETRY_BACKOFF_MS || '1000', 10) // base backoff
 const TRANSIENT_ERROR_CODES = new Set(['ETIMEDOUT', 'ECONNRESET', 'EPIPE', 'EAI_AGAIN', 'ECONNREFUSED'])
+const REQUEST_TIMEOUT_MS = parseInt(process.env.EVAL_SCRAPE_REQUEST_TIMEOUT_MS || '30000', 10)
+const REQUEST_TRANSPORT = String(process.env.EVAL_SCRAPE_TRANSPORT || 'auto').toLowerCase()
+
+const loadUrlWithCurl = function (url) {
+  return new Promise(function (resolve, reject) {
+    execFile('curl', [
+      '-fsSL',
+      '--location',
+      '--connect-timeout', String(Math.max(5, Math.ceil(REQUEST_TIMEOUT_MS / 1000))),
+      '--max-time', String(Math.max(15, Math.ceil(REQUEST_TIMEOUT_MS / 1000))),
+      '-H', `Cookie: PHPSESSID=${sessionCookie};`,
+      '-H', 'User-Agent: Princeton Courses (https://www.princetoncourses.com)',
+      url
+    ], function (error, stdout, stderr) {
+      if (error) {
+        if (!error.code && /timed out/i.test(stderr || error.message || '')) {
+          error.code = 'ETIMEDOUT'
+        }
+        error.message = stderr || error.message
+        return reject(error)
+      }
+      resolve(stdout)
+    })
+  })
+}
 
 const loadUrl = function (url, redirectCount = 0) {
   return new Promise(function (resolve, reject) {
@@ -31,7 +57,7 @@ const loadUrl = function (url, redirectCount = 0) {
         Cookie: `PHPSESSID=${sessionCookie};`,
         'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
       },
-      timeout: 15000
+      timeout: REQUEST_TIMEOUT_MS
     }, function (response) {
       const status = response.statusCode || 0
       const location = response.headers.location
@@ -55,7 +81,9 @@ const loadUrl = function (url, redirectCount = 0) {
     })
 
     request.on('timeout', function () {
-      request.destroy(new Error('Timed out fetching registrar evaluation page'))
+      const error = new Error('Timed out fetching registrar evaluation page')
+      error.code = 'ETIMEDOUT'
+      request.destroy(error)
     })
 
     request.on('error', function (error) {
@@ -67,7 +95,21 @@ const loadUrl = function (url, redirectCount = 0) {
 // Load a request from the server and call the function externalCallback
 const loadPage = async function (term, courseID) {
   const url = 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID
-  return loadUrl(url)
+  if (REQUEST_TRANSPORT === 'curl') {
+    return loadUrlWithCurl(url)
+  }
+  if (REQUEST_TRANSPORT === 'https') {
+    return loadUrl(url)
+  }
+  try {
+    return await loadUrl(url)
+  } catch (error) {
+    if (error && error.code && TRANSIENT_ERROR_CODES.has(error.code)) {
+      console.log(`\tPrimary HTTPS request failed for course ${courseID}; retrying with curl fallback.`.yellow)
+      return loadUrlWithCurl(url)
+    }
+    throw error
+  }
 }
 
 // Return the course evaluation data for the given semester/courseID to the function callback
