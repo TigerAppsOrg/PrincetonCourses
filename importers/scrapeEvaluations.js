@@ -30,14 +30,33 @@ const REQUEST_TRANSPORT = String(process.env.EVAL_SCRAPE_TRANSPORT || 'auto').to
 const loadUrlWithCurl = function (url) {
   return new Promise(function (resolve, reject) {
     execFile('curl', [
-      '-fsSL',
+      '-sS',
       '--location',
       '--connect-timeout', String(Math.max(5, Math.ceil(REQUEST_TIMEOUT_MS / 1000))),
       '--max-time', String(Math.max(15, Math.ceil(REQUEST_TIMEOUT_MS / 1000))),
       '-H', `Cookie: PHPSESSID=${sessionCookie};`,
       '-H', 'User-Agent: Princeton Courses (https://www.princetoncourses.com)',
+      '-w', '\n__HTTP_STATUS__:%{http_code}',
       url
     ], function (error, stdout, stderr) {
+      const output = stdout || ''
+      const marker = '\n__HTTP_STATUS__:'
+      const markerIndex = output.lastIndexOf(marker)
+      const body = markerIndex >= 0 ? output.slice(0, markerIndex) : output
+      const statusText = markerIndex >= 0 ? output.slice(markerIndex + marker.length).trim() : ''
+      const status = Number(statusText || 0)
+
+      if (error && !error.code && /timed out/i.test(stderr || error.message || '')) {
+        error.code = 'ETIMEDOUT'
+      }
+
+      if (status >= 400) {
+        const preview = body.replace(/\s+/g, ' ').trim().slice(0, 240)
+        const httpError = new Error(`HTTP ${status}${preview ? `: ${preview}` : ''}`)
+        httpError.code = `HTTP_${status}`
+        return reject(httpError)
+      }
+
       if (error) {
         if (!error.code && /timed out/i.test(stderr || error.message || '')) {
           error.code = 'ETIMEDOUT'
@@ -45,7 +64,7 @@ const loadUrlWithCurl = function (url) {
         error.message = stderr || error.message
         return reject(error)
       }
-      resolve(stdout)
+      resolve(body)
     })
   })
 }
