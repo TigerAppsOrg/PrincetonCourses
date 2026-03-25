@@ -254,6 +254,10 @@ function newDOMcourseResult(course, props) {
   var dot = ''
   if (course.hasOwnProperty('open')) dot = newHTMLlock(course)
 
+  // build a summary string for Ask AI context
+  var courseLabel = newHTMLlistings(course).replace(/<[^>]*>/g, '')
+  var askAiBtn = '<button class="ask-ai-course-btn" data-course-label="' + courseLabel + '" data-course-title="' + (course.title || '').replace(/"/g, '&quot;') + '">✦ Ask AI</button>'
+
   // html string for the DOM object
   var htmlString = (
     '<li class="list-group-item search-result">'
@@ -272,7 +276,7 @@ function newDOMcourseResult(course, props) {
     + '</div>'
     + '<div class="flex-container-row">'
       + '<div class="flex-item-stretch truncate">' + course.title + '</div>'
-      + '<div class="flex-item-rigid">' + semester + '</div>'
+      + '<div class="flex-item-rigid">' + semester + askAiBtn + '</div>'
     + '</div>'
   + '</li>'
   )
@@ -291,6 +295,16 @@ function newDOMcourseResult(course, props) {
     pin.courseId = course._id
     $(pin).click(togglePin)
   }
+
+  // bind Ask AI button
+  $(entry).find('.ask-ai-course-btn').on('click', function (e) {
+    e.stopPropagation()
+    var label = $(this).data('course-label')
+    var title = $(this).data('course-title')
+    var prompt = 'Tell me about ' + label + ' (' + title + '). What is the workload like? How are the evaluations?'
+    if (!$('#chat-pane').is(':visible')) toggleChat()
+    sendChatMessage(prompt)
+  })
 
   return entry
 }
