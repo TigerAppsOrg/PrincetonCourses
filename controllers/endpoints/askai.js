@@ -1,0 +1,82 @@
+let express = require('express')
+let router = express.Router()
+let config = require('../config')
+
+router.post('/stream', async function (req, res) {
+  let user = res.locals.user
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' })
+  }
+
+  let { messages, conversationId, term } = req.body
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'messages array is required' })
+  }
+
+  let gatewayURL = config.askGatewayURL + '/ask/stream'
+  let headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream'
+  }
+  if (config.askGatewayToken) {
+    headers['Authorization'] = 'Bearer ' + config.askGatewayToken
+  }
+  headers['x-external-user-id'] = user._id
+
+  let body = { messages }
+  if (conversationId) body.conversationId = conversationId
+  if (term) body.term = term
+
+  try {
+    let upstream = await fetch(gatewayURL, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    })
+
+    if (!upstream.ok) {
+      let errText = ''
+      try { errText = await upstream.text() } catch (_) {}
+      return res.status(upstream.status).json({
+        error: 'Ask Gateway error',
+        status: upstream.status,
+        detail: errText
+      })
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.flushHeaders()
+
+    let reader = upstream.body.getReader()
+    let decoder = new TextDecoder()
+
+    try {
+      while (true) {
+        let { done, value } = await reader.read()
+        if (done) break
+        res.write(decoder.decode(value, { stream: true }))
+      }
+    } catch (streamErr) {
+      if (!res.writableEnded) {
+        res.write('event: error\ndata: {"message":"Stream interrupted"}\n\n')
+      }
+    }
+
+    res.end()
+  } catch (err) {
+    if (!res.headersSent) {
+      return res.status(502).json({
+        error: 'Failed to connect to Ask Gateway',
+        detail: err.message
+      })
+    }
+    if (!res.writableEnded) {
+      res.write('event: error\ndata: ' + JSON.stringify({ message: err.message }) + '\n\n')
+      res.end()
+    }
+  }
+})
+
+module.exports = router
