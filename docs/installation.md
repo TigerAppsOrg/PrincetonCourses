@@ -5,7 +5,7 @@ Princeton Courses is a web app that you can run on any modern computer. Follow t
 2. Clone the Princeton Courses git repository to your computer by running `git clone https://github.com/sebthedev/PrincetonCourses.git` or by using the GitHub app.
 3. `cd` into your clone of the repository and run `npm install` to install Princeton Courses’ dependencies.
 4. In this folder, create a file named `.env` which will be used to store environment variables. Add a new line to this file with the text `MONGODB_URI='DATABASE_URL'` where `DATABASE_URL` is replaced with the `mongodb://` address of your MongoDB server and database. If you don’t have a MongoDB database already, you can host a database locally on your computer (instructions) or use a service like [MongoDB Atlas](https://www.mongodb.com/cloud/atlas). Save this file.
-4. Populate your database with the details about all the courses by running the following commands. For more information about what these scripts do, see [importingData.md](importingData.md).
+4. Populate your database with the details about all the courses by running the following commands. For the current importer workflow, GitHub Actions instructions, and dry-run limitations, see [importingData.md](importingData.md).
     * `node importers/importBasicCourseDetails.js`
     * `node importers/scrapeEvaluations.js`
       (Press the return key when prompted.)
