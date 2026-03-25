@@ -122,8 +122,6 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
       process.exit(1)
     }
 
-    console.log('\tReceived data for course %s in semester %s.'.green, courseID, semester)
-
     // Extract scores
     var scores = {}
     if ($.html().includes(semester)) {
@@ -149,6 +147,8 @@ const getCourseEvaluationData = function (semester, courseID, externalCallback) 
         })
       }
     }
+
+    console.log('\tReceived data for course %s in semester %s: %d comments, %d score fields.'.green, courseID, semester, comments.length, Object.keys(scores).length)
 
     externalCallback(null, scores, comments)
   }).catch(function (err) {
