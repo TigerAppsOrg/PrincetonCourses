@@ -3,6 +3,7 @@
 
 // Load external dependencies
 const cheerio = require('cheerio')
+const https = require('https')
 const promptly = require('promptly')
 require('colors')
 
@@ -18,20 +19,55 @@ let sessionCookie
 let courses
 
 // Throttling and retry configuration
-const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '250', 10) // delay between course requests
-const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '3', 10) // per-course retries on transient errors
+const DELAY_MS = parseInt(process.env.EVAL_SCRAPE_DELAY_MS || '600', 10) // delay between course requests
+const MAX_RETRIES = parseInt(process.env.EVAL_SCRAPE_MAX_RETRIES || '5', 10) // per-course retries on transient errors
 const RETRY_BACKOFF_MS = parseInt(process.env.EVAL_SCRAPE_RETRY_BACKOFF_MS || '1000', 10) // base backoff
+const TRANSIENT_ERROR_CODES = new Set(['ETIMEDOUT', 'ECONNRESET', 'EPIPE', 'EAI_AGAIN', 'ECONNREFUSED'])
+
+const loadUrl = function (url, redirectCount = 0) {
+  return new Promise(function (resolve, reject) {
+    const request = https.get(url, {
+      headers: {
+        Cookie: `PHPSESSID=${sessionCookie};`,
+        'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
+      },
+      timeout: 15000
+    }, function (response) {
+      const status = response.statusCode || 0
+      const location = response.headers.location
+
+      if (status >= 300 && status < 400 && location) {
+        response.resume()
+        if (redirectCount >= 5) {
+          return reject(new Error('Too many redirects while loading registrar evaluation page'))
+        }
+        return resolve(loadUrl(location, redirectCount + 1))
+      }
+
+      let body = ''
+      response.setEncoding('utf8')
+      response.on('data', function (chunk) {
+        body += chunk
+      })
+      response.on('end', function () {
+        resolve(body)
+      })
+    })
+
+    request.on('timeout', function () {
+      request.destroy(new Error('Timed out fetching registrar evaluation page'))
+    })
+
+    request.on('error', function (error) {
+      reject(error)
+    })
+  })
+}
 
 // Load a request from the server and call the function externalCallback
 const loadPage = async function (term, courseID) {
   const url = 'https://registrarapps.princeton.edu/course-evaluation?terminfo=' + term + '&courseinfo=' + courseID
-  var response = await fetch(url, {
-    headers: {
-      Cookie: `PHPSESSID=${sessionCookie};`,
-      'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
-    }
-  })
-  return response.text()
+  return loadUrl(url)
 }
 
 // Return the course evaluation data for the given semester/courseID to the function callback
@@ -191,8 +227,9 @@ getCookie().then(function (cookie) {
         return true
       } catch (err) {
         attempt++
-        const transient = (err && (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET'))
-        console.error((`Error on course ${course.courseID} (attempt ${attempt}/${MAX_RETRIES}): ${err && err.message || err}`).red)
+        const transient = Boolean(err && err.code && TRANSIENT_ERROR_CODES.has(err.code))
+        const detail = err && err.code ? ` [${err.code}]` : ''
+        console.error((`Error on course ${course.courseID} (attempt ${attempt}/${MAX_RETRIES}): ${err && err.message || err}${detail}`).red)
         if (!transient || attempt >= MAX_RETRIES) {
           return false
         }
