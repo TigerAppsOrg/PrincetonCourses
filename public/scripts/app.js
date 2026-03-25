@@ -15,6 +15,7 @@ $(document).ready(function() {
   init_display();
   init_evals();
   init_suggest();
+  init_chat(); 
   //init_updates(); // BENSU: Enable to show update popup, but keep the popup information below updated by changing the text and the popup number
 })
 
@@ -256,6 +257,11 @@ var init_evals = function() {
 var init_suggest = function() {
   suggest_load()
   $('#suggest-toggle').click(toggleSuggest)
+}
+
+// to initialize AI chat display
+var init_chat = function() {
+  $('#chat-toggle').click(toggleChat)
 }
 
 // to initialize updates popup
