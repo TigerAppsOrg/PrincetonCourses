@@ -884,7 +884,7 @@ body {
   color: #fff;
   padding: 8px 12px;
   border-radius: 12px 12px 3px 12px;
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 400;
   text-align: left;
   white-space: pre-wrap;
@@ -986,7 +986,7 @@ body {
 }
 .chat-tool-name {
   flex: 1;
-  font-size: 0.88rem;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
 }
@@ -1247,7 +1247,7 @@ body {
   border: 1px solid #ddd;
   border-radius: 3px;
   padding: 7px 10px;
-  font-size: 0.88rem;
+  font-size: 14px;
   color: #333;
   cursor: pointer;
   text-align: left;
@@ -1289,7 +1289,7 @@ body {
   background: none;
   border: none;
   outline: none;
-  font-size: 0.88rem;
+  font-size: 14px;
   color: #333;
   resize: none;
   max-height: 100px;
