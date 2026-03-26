@@ -248,27 +248,35 @@
       </div>
       <div id="chat-resizer" class="flex-item-rigid resizer-inactive"></div>
       <div id="chat-pane" class="flex-container-col slide" style="display: none;">
-        <div id="chat-header" class="flex-item-rigid flex-container-row" style="min-height: 50px; padding: 0 10px; background-color: #1a1a1a; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; border: none; box-shadow: none;">
+        <div id="chat-header" class="flex-item-rigid">
           <span id="ai-bot-dot"></span>
-          <strong style="color: white; flex-grow: 1;">AI Course Assistant</strong>
-          <span id="chat-close-btn" style="color: white; cursor: pointer; font-size: 18px;" onclick="toggleChat()">&times;</span>
-        </div>
-        <div id="chat-messages" class="flex-item-stretch" style="padding: 10px; background-color: #fff; overflow-y: auto;">
-          <!-- messages appear here -->
-        </div>
-        <div id="chat-prompts-area" class="flex-item-rigid" style="padding: 8px 12px 6px; background: #fafafa; border-top: 1px solid #eee;">
-          <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.06em; color: #bbb; margin-bottom: 6px;">Suggestions</div>
-          <div id="chat-prompt-chips" style="display: flex; flex-direction: column; gap: 5px;">
-            <button class="chat-prompt-chip" onclick="sendFromChip('Best courses for beginners?')">💡 Best courses for beginners? <span style="margin-left:auto; color:#ccc;">→</span></button>
-            <button class="chat-prompt-chip" onclick="sendFromChip('Hardest vs easiest CS?')">⚖️ Hardest vs easiest CS? <span style="margin-left:auto; color:#ccc;">→</span></button>
-            <button class="chat-prompt-chip" onclick="sendFromChip('Best AI/ML electives?')">🤖 Best AI/ML electives? <span style="margin-left:auto; color:#ccc;">→</span></button>
+          <strong>AI Course Assistant</strong>
+          <div id="chat-header-actions">
+            <button id="chat-new-convo" title="New conversation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <button id="chat-close-btn" onclick="toggleChat()" title="Close chat">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
           </div>
         </div>
-        <div id="chat-text-box" class="flex-item-rigid" style="padding: 10px 12px 12px; border-top: 1px solid #eee; background: white;">
-          <div style="display: flex; align-items: flex-end; gap: 6px; background: #f5f5f5; border: 1.5px solid #ddd; border-radius: 8px; padding: 8px 10px;">
-            <textarea id="chat-ta" rows="1" oninput="autoResize(this)" style="flex: 1; background: none; border: none; outline: none; font-size: 1.3rem; color: #222; resize: none; max-height: 90px;" placeholder="Ask about courses, workload, prereqs..."></textarea>
-            <button id="chat-send-btn" style="width: 28px; height: 28px; background: #1a1a1a; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s;">
+        <div id="chat-messages" class="flex-item-stretch">
+          <!-- messages appear here -->
+        </div>
+        <div id="chat-prompts-area" class="flex-item-rigid">
+          <div class="chat-prompts-label">Suggestions</div>
+          <div id="chat-prompt-chips">
+            <!-- chips are rendered by chat.js -->
+          </div>
+        </div>
+        <div id="chat-text-box" class="flex-item-rigid">
+          <div id="chat-input-row">
+            <textarea id="chat-ta" rows="1" oninput="autoResize(this)" placeholder="Ask about courses, workload, prereqs..."></textarea>
+            <button id="chat-send-btn" title="Send message">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+            <button id="chat-stop-btn" title="Stop generating" style="display: none;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="none"><rect x="2" y="2" width="20" height="20" rx="2"></rect></svg>
             </button>
           </div>
         </div>

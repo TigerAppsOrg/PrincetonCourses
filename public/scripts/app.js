@@ -90,6 +90,17 @@ var init_panes = function() {
     handleSelector: "#suggest-resizer",
     resizeHeight: false
   })
+
+  var chatPaneWidth = localStorage.getItem('#chat-resizer')
+  if (chatPaneWidth !== undefined) {
+    $('#chat-pane').css('width', chatPaneWidth)
+  }
+
+  $('#chat-pane').resizable({
+    handleSelector: '#chat-resizer',
+    resizeHeight: false,
+    resizeWidthFrom: 'left'
+  })
 }
 
 // to initalize search pane section collapsing

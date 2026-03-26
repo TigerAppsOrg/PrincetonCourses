@@ -4,8 +4,11 @@ var chatState = {
   messages: [],
   conversationId: null,
   streaming: false,
-  abortController: null
+  abortController: null,
+  userToggledThinking: false
 }
+
+// --- Toggle & Layout ---
 
 function toggleChat () {
   if (document.isMobile) {
@@ -30,7 +33,30 @@ function toggleChat () {
 
 function autoResize (el) {
   el.style.height = 'auto'
-  el.style.height = Math.min(el.scrollHeight, 90) + 'px'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+}
+
+// --- New Conversation ---
+
+function newConversation () {
+  if (chatState.streaming) cancelStream()
+  chatState.messages = []
+  chatState.conversationId = null
+  chatState.userToggledThinking = false
+  $('#chat-messages').empty()
+  appendWelcomeMessage()
+  $('#chat-prompts-area').slideDown(150)
+  updateSuggestionChips()
+}
+
+// --- Cancel / Stop ---
+
+function cancelStream () {
+  if (chatState.abortController) {
+    chatState.abortController.abort()
+    chatState.abortController = null
+  }
+  setStreamingUI(false)
 }
 
 // --- SSE Parser ---
@@ -69,9 +95,22 @@ function createSSEParser (onEvent) {
 
 // --- Utility ---
 
+var chatScrollPinned = true
+
 function scrollChatToBottom () {
+  if (!chatScrollPinned) return
   var el = document.getElementById('chat-messages')
   if (el) el.scrollTop = el.scrollHeight
+}
+
+function initChatScroll () {
+  var el = document.getElementById('chat-messages')
+  if (!el) return
+  el.addEventListener('scroll', function () {
+    // Pinned if within 40px of the bottom
+    var atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    chatScrollPinned = atBottom
+  })
 }
 
 function escapeHtml (str) {
@@ -80,34 +119,88 @@ function escapeHtml (str) {
   return div.innerHTML
 }
 
-// --- Rich Markdown ---
+function getCurrentTerm () {
+  var semesterEl = document.getElementById('semester')
+  return semesterEl ? semesterEl.value : null
+}
+
+// --- Markdown Rendering (marked + highlight.js) ---
+
+var chatMarkedRenderer = (function () {
+  /* global marked, hljs */
+  var renderer = new marked.Renderer()
+
+  // Code blocks: syntax highlighting, language label, copy button
+  renderer.code = function (token) {
+    var code = token.text || ''
+    var lang = (token.lang || '').trim()
+    var highlighted = ''
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        highlighted = hljs.highlight(code, { language: lang }).value
+      } catch (_) {
+        highlighted = escapeHtml(code)
+      }
+    } else {
+      highlighted = escapeHtml(code)
+    }
+    var langLabel = lang ? '<span class="chat-code-lang">' + escapeHtml(lang) + '</span>' : ''
+    return '<div class="chat-code-block">' +
+      '<div class="chat-code-header">' + langLabel +
+      '<button class="chat-code-copy" onclick="copyChatCode(this)">Copy</button>' +
+      '</div>' +
+      '<pre><code class="hljs' + (lang ? ' language-' + escapeHtml(lang) : '') + '">' +
+      highlighted + '</code></pre></div>'
+  }
+
+  // Inline code
+  renderer.codespan = function (token) {
+    return '<code class="chat-inline-code">' + escapeHtml(token.text || '') + '</code>'
+  }
+
+  // Links open in new tab
+  renderer.link = function (token) {
+    return '<a href="' + escapeHtml(token.href || '') + '" target="_blank" rel="noopener noreferrer" class="chat-link">' +
+      (token.text || '') + '</a>'
+  }
+
+  return renderer
+})()
+
+;(function () {
+  marked.setOptions({
+    renderer: chatMarkedRenderer,
+    gfm: true,
+    breaks: true
+  })
+})()
 
 function renderMarkdown (text) {
-  var escaped = escapeHtml(text)
-  // Headers
-  escaped = escaped.replace(/^### (.+)$/gm, '<h4 class="chat-md-h">$1</h4>')
-  escaped = escaped.replace(/^## (.+)$/gm, '<h3 class="chat-md-h">$1</h3>')
-  // Bold
-  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  // Italic
-  escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  // Inline code
-  escaped = escaped.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>')
-  // Bullet lists
-  escaped = escaped.replace(/^[-*] (.+)$/gm, '<li class="chat-li">$1</li>')
-  escaped = escaped.replace(/((?:<li class="chat-li">.*<\/li>\n?)+)/g, '<ul class="chat-ul">$1</ul>')
-  // Numbered lists
-  escaped = escaped.replace(/^\d+\. (.+)$/gm, '<li class="chat-li">$1</li>')
-  // Line breaks (but not inside block elements)
-  escaped = escaped.replace(/\n/g, '<br>')
-  // Clean up extra <br> after block elements
-  escaped = escaped.replace(/<\/li><br>/g, '</li>')
-  escaped = escaped.replace(/<\/ul><br>/g, '</ul>')
-  escaped = escaped.replace(/<\/h[34]><br>/g, function (m) { return m.replace('<br>', '') })
-  return escaped
+  try {
+    return marked.parse(text)
+  } catch (_) {
+    return escapeHtml(text)
+  }
+}
+
+function copyChatCode (btn) {
+  var codeEl = btn.closest('.chat-code-block').querySelector('code')
+  if (!codeEl) return
+  navigator.clipboard.writeText(codeEl.textContent).then(function () {
+    btn.textContent = 'Copied!'
+    setTimeout(function () { btn.textContent = 'Copy' }, 2000)
+  })
 }
 
 // --- UI Building ---
+
+function appendWelcomeMessage () {
+  var html = '<div class="chat-welcome chat-animate-in">' +
+    '<div class="chat-welcome-title">What can I help you find?</div>' +
+    '<div class="chat-welcome-subtitle">Ask about courses, workload, ratings, prerequisites, or help finding the right classes.</div>' +
+    '</div>'
+  $('#chat-messages').append(html)
+}
 
 function appendUserMessage (text) {
   var html = '<div class="chat-msg chat-msg-user chat-animate-in">' +
@@ -119,7 +212,6 @@ function appendUserMessage (text) {
 function createAssistantContainer () {
   var id = 'ai-resp-' + Date.now()
   var html = '<div class="chat-msg chat-msg-ai chat-animate-in" id="' + id + '">' +
-    '<div class="chat-ai-avatar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EE7F2D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>' +
     '<div class="chat-ai-body" id="' + id + '-body"></div>' +
     '</div>'
   $('#chat-messages').append(html)
@@ -128,11 +220,11 @@ function createAssistantContainer () {
 }
 
 function appendThinkingIndicator (containerId) {
-  var thinkId = containerId + '-thinking'
+  var thinkId = containerId + '-thinking-' + Date.now()
   var html = '<div class="chat-thinking chat-animate-in" id="' + thinkId + '">' +
-    '<div class="chat-thinking-header" onclick="toggleChatCollapse(\'' + thinkId + '-content\')">' +
+    '<div class="chat-thinking-header" onclick="toggleThinking(\'' + thinkId + '\')">' +
     '<span class="chat-collapse-chevron">&#8250;</span>' +
-    '<span class="chat-thinking-label">Thought process</span>' +
+    '<span class="chat-thinking-label">Thinking</span>' +
     '<span class="chat-thinking-dots"><span>.</span><span>.</span><span>.</span></span>' +
     '</div>' +
     '<div class="chat-thinking-content" id="' + thinkId + '-content" style="display:none;"></div>' +
@@ -142,6 +234,21 @@ function appendThinkingIndicator (containerId) {
   return thinkId
 }
 
+function collapseThinking (thinkId) {
+  if (chatState.userToggledThinking) return
+  var el = $('#' + thinkId + '-content')
+  var chevron = el.parent().find('.chat-collapse-chevron').first()
+  var label = el.parent().find('.chat-thinking-label').first()
+  el.slideUp(150)
+  chevron.removeClass('chat-chevron-open')
+  label.text('Thought process')
+}
+
+function toggleThinking (thinkId) {
+  chatState.userToggledThinking = true
+  toggleChatCollapse(thinkId + '-content')
+}
+
 function appendToolCard (containerId, toolName, args) {
   var toolId = containerId + '-tool-' + Date.now()
   var displayName = toolName.replace(/_/g, ' ')
@@ -149,7 +256,7 @@ function appendToolCard (containerId, toolName, args) {
     '<div class="chat-tool-header" onclick="toggleChatCollapse(\'' + toolId + '-detail\')">' +
     '<span class="chat-collapse-chevron">&#8250;</span>' +
     '<span class="chat-tool-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span>' +
-    '<span class="chat-tool-name">' + escapeHtml(displayName) + '</span>' +
+    '<span class="chat-tool-name">' + escapeHtml(displayName) + '<span class="chat-tool-ellipsis">...</span></span>' +
     '<span class="chat-tool-status" id="' + toolId + '-status"><span class="chat-tool-spinner"></span></span>' +
     '</div>' +
     '<div class="chat-tool-detail" id="' + toolId + '-detail" style="display:none;">' +
@@ -163,7 +270,8 @@ function appendToolCard (containerId, toolName, args) {
 }
 
 function markToolDone (toolId) {
-  $('#' + toolId + '-status').html('<span class="chat-tool-done">Done</span>')
+  $('#' + toolId + '-status').html('<span class="chat-tool-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5cb85c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>')
+  $('#' + toolId).find('.chat-tool-ellipsis').remove()
 }
 
 function appendTextBlock (containerId) {
@@ -187,11 +295,18 @@ function toggleChatCollapse (id) {
 
 function setStreamingUI (active) {
   chatState.streaming = active
-  var btn = document.getElementById('chat-send-btn')
+  var sendBtn = document.getElementById('chat-send-btn')
+  var stopBtn = document.getElementById('chat-stop-btn')
   var ta = document.getElementById('chat-ta')
-  if (btn) btn.disabled = active
-  if (ta) ta.disabled = active
-  $('#chat-send-btn').css('opacity', active ? '0.4' : '1')
+  if (ta) ta.disabled = false
+  if (active) {
+    if (sendBtn) sendBtn.style.display = 'none'
+    if (stopBtn) stopBtn.style.display = 'flex'
+  } else {
+    if (sendBtn) sendBtn.style.display = 'flex'
+    if (stopBtn) stopBtn.style.display = 'none'
+    if (ta) ta.focus()
+  }
 }
 
 function showErrorInChat (msg) {
@@ -204,23 +319,51 @@ function showErrorInChat (msg) {
   scrollChatToBottom()
 }
 
-// --- Core Send Logic ---
+// --- Suggestion Chips ---
+
+function updateSuggestionChips () {
+  var chips = [
+    { icon: '\uD83D\uDCA1', text: 'Best courses for beginners?' },
+    { icon: '\u2696\uFE0F', text: 'Hardest vs easiest CS courses?' },
+    { icon: '\uD83E\uDD16', text: 'Best AI/ML electives?' }
+  ]
+  var container = document.getElementById('chat-prompt-chips')
+  if (!container) return
+  container.innerHTML = ''
+  for (var i = 0; i < chips.length; i++) {
+    var btn = document.createElement('button')
+    btn.className = 'chat-prompt-chip'
+    btn.setAttribute('data-text', chips[i].text)
+    btn.innerHTML = chips[i].icon + ' ' + escapeHtml(chips[i].text) + ' <span style="margin-left:auto; color:#ccc;">\u2192</span>'
+    btn.onclick = (function (text) {
+      return function () { sendFromChip(text) }
+    })(chips[i].text)
+    container.appendChild(btn)
+  }
+}
+
+// --- Core Send Logic (parts-based, like Harness) ---
 
 function sendChatMessage (text) {
   if (!text || !text.trim() || chatState.streaming) return
   text = text.trim()
 
+  // Remove welcome message if present
+  $('.chat-welcome').remove()
+
   chatState.messages.push({ role: 'user', content: text })
+  chatState.userToggledThinking = false
+  chatScrollPinned = true
   appendUserMessage(text)
   $('#chat-prompts-area').slideUp(150)
 
   var containerId = createAssistantContainer()
-  var thinkingId = null
-  var currentTextId = null
-  var currentToolId = null
+
+  // Parts array: chronological log of all content blocks
+  // Each part: { type: 'reasoning'|'text'|'tool_call', content, domId, toolId, ... }
+  var parts = []
+  var lastPartType = null
   var fullText = ''
-  var hasStartedText = false
-  var hasThinking = false
 
   setStreamingUI(true)
 
@@ -229,6 +372,43 @@ function sendChatMessage (text) {
 
   var payload = { messages: chatState.messages }
   if (chatState.conversationId) payload.conversationId = chatState.conversationId
+  var term = getCurrentTerm()
+  if (term) payload.term = term
+
+  // Helper: get or create the current part of a given type
+  function ensurePart (type) {
+    if (lastPartType === type && parts.length > 0) {
+      return parts[parts.length - 1]
+    }
+    var part = { type: type, content: '', domId: null, toolId: null }
+    if (type === 'reasoning') {
+      var thinkId = appendThinkingIndicator(containerId)
+      part.domId = thinkId
+      // Open it for streaming
+      var contentEl = document.getElementById(thinkId + '-content')
+      if (contentEl) {
+        contentEl.style.display = 'block'
+        $('#' + thinkId).find('.chat-collapse-chevron').first().addClass('chat-chevron-open')
+      }
+    } else if (type === 'text') {
+      part.domId = appendTextBlock(containerId)
+    }
+    parts.push(part)
+    lastPartType = type
+    return part
+  }
+
+  // Helper: finalize previous thinking block when type changes away from reasoning
+  function finalizePreviousThinking () {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      if (parts[i].type === 'reasoning' && parts[i].domId) {
+        var thinkId = parts[i].domId
+        $('#' + thinkId).find('.chat-thinking-dots').remove()
+        collapseThinking(thinkId)
+        break
+      }
+    }
+  }
 
   fetch('/api/ask-ai/stream', {
     method: 'POST',
@@ -251,29 +431,59 @@ function sendChatMessage (text) {
     var parser = createSSEParser(function (eventType, data) {
       switch (eventType) {
         case 'status':
-          var phase = (data && data.phase) || ''
-          if (phase === 'starting' && !hasThinking) {
-            thinkingId = appendThinkingIndicator(containerId)
-            hasThinking = true
+          // Status events are informational; we let actual content events drive the UI
+          break
+
+        case 'thinking':
+          var reasoningText = (typeof data === 'object' && data !== null) ? (data.content || '') : String(data)
+          if (!reasoningText) break
+          if (lastPartType !== 'reasoning') {
+            finalizePreviousThinking()
           }
-          if (phase === 'streaming' && thinkingId) {
-            $('#' + thinkingId).find('.chat-thinking-dots').remove()
+          var part = ensurePart('reasoning')
+          part.content += reasoningText
+          var thinkContentEl = document.getElementById(part.domId + '-content')
+          if (thinkContentEl) {
+            thinkContentEl.innerHTML = renderMarkdown(part.content)
           }
+          scrollChatToBottom()
           break
 
         case 'tool_call':
-          if (thinkingId) {
-            $('#' + thinkingId).find('.chat-thinking-dots').remove()
+          if (lastPartType === 'reasoning') {
+            finalizePreviousThinking()
           }
           var toolArgs = (data && data.arguments) || null
           var toolName = (data && data.name) || 'unknown'
-          currentToolId = appendToolCard(containerId, toolName, toolArgs)
-          currentTextId = null
+          var toolCallId = (data && data.call_id) || null
+          var toolDomId = appendToolCard(containerId, toolName, toolArgs)
+          var toolPart = { type: 'tool_call', content: '', domId: toolDomId, toolId: toolCallId, toolName: toolName }
+          parts.push(toolPart)
+          lastPartType = 'tool_call'
+          scrollChatToBottom()
           break
 
         case 'tool_result':
-          if (currentToolId) {
-            markToolDone(currentToolId)
+          // Find the matching tool_call part by name (or the last tool_call)
+          var resultName = (data && data.name) || ''
+          var resultCallId = (data && data.call_id) || null
+          var matchedPart = null
+          for (var ti = parts.length - 1; ti >= 0; ti--) {
+            if (parts[ti].type === 'tool_call') {
+              if (resultCallId && parts[ti].toolId === resultCallId) {
+                matchedPart = parts[ti]
+                break
+              }
+              if (resultName && parts[ti].toolName === resultName) {
+                matchedPart = parts[ti]
+                break
+              }
+              // Fallback: last unresolved tool_call
+              if (!matchedPart) matchedPart = parts[ti]
+            }
+          }
+          if (matchedPart && matchedPart.domId) {
+            markToolDone(matchedPart.domId)
             if (data && data.result && data.result.content) {
               var resultPreview = ''
               for (var ci = 0; ci < data.result.content.length; ci++) {
@@ -288,23 +498,27 @@ function sendChatMessage (text) {
               }
               if (resultPreview.length > 500) resultPreview = resultPreview.substring(0, 500) + '\n...'
               if (resultPreview) {
-                $('#' + currentToolId + '-result').html('<pre class="chat-tool-args">' + escapeHtml(resultPreview) + '</pre>')
+                $('#' + matchedPart.domId + '-result').html('<pre class="chat-tool-args">' + escapeHtml(resultPreview) + '</pre>')
               }
             }
-            currentToolId = null
           }
           break
 
         case 'token':
           var tokenText = (typeof data === 'object' && data !== null) ? (data.token || data.text || '') : String(data)
           if (!tokenText) break
-          if (!hasStartedText) {
-            currentTextId = appendTextBlock(containerId)
-            hasStartedText = true
+          if (lastPartType === 'reasoning') {
+            finalizePreviousThinking()
           }
-          fullText += tokenText
-          if (currentTextId) {
-            document.getElementById(currentTextId).innerHTML = renderMarkdown(fullText)
+          var textPart = ensurePart('text')
+          textPart.content += tokenText
+          fullText = ''
+          // Rebuild fullText from all text parts
+          for (var fi = 0; fi < parts.length; fi++) {
+            if (parts[fi].type === 'text') fullText += parts[fi].content
+          }
+          if (textPart.domId) {
+            document.getElementById(textPart.domId).innerHTML = renderMarkdown(textPart.content)
           }
           scrollChatToBottom()
           break
@@ -316,6 +530,8 @@ function sendChatMessage (text) {
           break
 
         case 'done':
+          // Finalize any open thinking block
+          finalizePreviousThinking()
           chatState.messages.push({ role: 'assistant', content: fullText })
           if (data && data.conversationId) chatState.conversationId = data.conversationId
           setStreamingUI(false)
@@ -327,6 +543,7 @@ function sendChatMessage (text) {
       return reader.read().then(function (result) {
         if (result.done) {
           if (chatState.streaming) {
+            finalizePreviousThinking()
             chatState.messages.push({ role: 'assistant', content: fullText })
             setStreamingUI(false)
           }
@@ -339,7 +556,13 @@ function sendChatMessage (text) {
 
     return pump()
   }).catch(function (err) {
-    if (err.name === 'AbortError') return
+    if (err.name === 'AbortError') {
+      if (fullText) {
+        chatState.messages.push({ role: 'assistant', content: fullText })
+      }
+      setStreamingUI(false)
+      return
+    }
     setStreamingUI(false)
     showErrorInChat(err.message || 'Something went wrong')
   })
@@ -368,6 +591,11 @@ function sendFromChip (text) {
 // --- Event Bindings ---
 
 $(function () {
+  // Show welcome message on init
+  appendWelcomeMessage()
+  updateSuggestionChips()
+  initChatScroll()
+
   $('#chat-send-btn').on('click', function () {
     var ta = document.getElementById('chat-ta')
     var text = ta.value
@@ -376,10 +604,18 @@ $(function () {
     sendChatMessage(text)
   })
 
+  $('#chat-stop-btn').on('click', function () {
+    cancelStream()
+  })
+
   $('#chat-ta').on('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       $('#chat-send-btn').click()
     }
+  })
+
+  $('#chat-new-convo').on('click', function () {
+    newConversation()
   })
 })

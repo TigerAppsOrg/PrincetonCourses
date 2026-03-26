@@ -256,7 +256,7 @@ function newDOMcourseResult(course, props) {
 
   // build a summary string for Ask AI context
   var courseLabel = newHTMLlistings(course).replace(/<[^>]*>/g, '')
-  var askAiBtn = '<button class="ask-ai-course-btn" data-course-label="' + courseLabel + '" data-course-title="' + (course.title || '').replace(/"/g, '&quot;') + '">✦ Ask AI</button>'
+  var askAiIcon = '<i class="fa fa-lg fa-diamond ask-ai-icon" data-course-label="' + courseLabel + '" data-course-title="' + (course.title || '').replace(/"/g, '&quot;') + '" data-toggle="tooltip" data-original-title="Ask AI about this course"></i>'
 
   // html string for the DOM object
   var htmlString = (
@@ -268,6 +268,7 @@ function newDOMcourseResult(course, props) {
       + '</div>'
       + '<div class="flex-item-rigid">'
         + '&nbsp;'
+        + askAiIcon + ' '
         + pinIcon + ' '
         + clashIcon + ' '
         + newHTMLfavIcon(course._id) + ' '
@@ -276,7 +277,7 @@ function newDOMcourseResult(course, props) {
     + '</div>'
     + '<div class="flex-container-row">'
       + '<div class="flex-item-stretch truncate">' + course.title + '</div>'
-      + '<div class="flex-item-rigid">' + semester + askAiBtn + '</div>'
+      + '<div class="flex-item-rigid">' + semester + '</div>'
     + '</div>'
   + '</li>'
   )
@@ -296,15 +297,18 @@ function newDOMcourseResult(course, props) {
     $(pin).click(togglePin)
   }
 
-  // bind Ask AI button
-  $(entry).find('.ask-ai-course-btn').on('click', function (e) {
-    e.stopPropagation()
-    var label = $(this).data('course-label')
-    var title = $(this).data('course-title')
-    var prompt = 'Tell me about ' + label + ' (' + title + '). What is the workload like? How are the evaluations?'
-    if (!$('#chat-pane').is(':visible')) toggleChat()
-    sendChatMessage(prompt)
-  })
+  // bind Ask AI icon
+  var aiIcon = $(entry).find('.ask-ai-icon')[0]
+  if (aiIcon) {
+    $(aiIcon).click(function (e) {
+      e.stopPropagation()
+      var label = $(this).data('course-label')
+      var title = $(this).data('course-title')
+      var prompt = 'Tell me about ' + label + ' (' + title + '). What is the workload like? How are the evaluations?'
+      if (!$('#chat-pane').is(':visible')) toggleChat()
+      sendChatMessage(prompt)
+    })
+  }
 
   return entry
 }
