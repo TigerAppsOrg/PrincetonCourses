@@ -819,7 +819,7 @@ body {
 /* ── Messages area ── white with subtle gray like evals-pane */
 #chat-messages {
   font-family: "Open Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1rem;
+  font-size: 1.06rem;
   line-height: 1.6;
   color: #333;
   padding: 12px 10px;
@@ -1041,7 +1041,7 @@ body {
 /* ── Streamed text ── */
 .chat-text-block {
   margin: 6px 0;
-  font-size: 1rem;
+  font-size: 1.06rem;
   line-height: 1.65;
   color: #333;
   word-break: break-word;
