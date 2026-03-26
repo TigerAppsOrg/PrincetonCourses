@@ -11,11 +11,17 @@ var chatState = {
 // --- Toggle & Layout ---
 
 function toggleChat () {
+  $('.navbar-collapse').collapse('hide')
   if (document.isMobile) {
-    $('#main-pane').slick('slickGoTo', 0)
-    $('.navbar-collapse').collapse('hide')
-    $('#chat-toggle').tooltip('hide')
-    $('#chat-toggle').blur()
+    var isVisible = $('#chat-pane').hasClass('chat-mobile-open')
+    if (isVisible) {
+      $('#chat-pane').removeClass('chat-mobile-open')
+      $('#chat-pane').hide()
+    } else {
+      $('#chat-pane').addClass('chat-mobile-open')
+      $('#chat-pane').show()
+      $('#chat-ta').focus()
+    }
     return false
   }
   var isVisible = $('#chat-pane').is(':visible')
@@ -25,9 +31,6 @@ function toggleChat () {
   $('#chat-resizer').addClass(isVisible ? 'resizer-inactive' : 'resizer')
   if (isVisible) $('#ask-ai-btn').removeClass('active')
   else $('#ask-ai-btn').addClass('active')
-  $('#chat-toggle').attr('data-original-title', isVisible ? 'Open AI chat' : 'Close AI chat')
-  $('#chat-toggle').tooltip('hide')
-  $('#chat-toggle').blur()
   return false
 }
 
@@ -374,6 +377,8 @@ function sendChatMessage (text) {
   if (chatState.conversationId) payload.conversationId = chatState.conversationId
   var term = getCurrentTerm()
   if (term) payload.term = term
+  var modelEl = document.getElementById('chat-model-select')
+  if (modelEl && modelEl.value) payload.model = modelEl.value
 
   // Helper: get or create the current part of a given type
   function ensurePart (type) {

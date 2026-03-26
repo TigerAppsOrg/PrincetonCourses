@@ -8,7 +8,7 @@ router.post('/stream', async function (req, res) {
     return res.status(401).json({ error: 'Authentication required' })
   }
 
-  let { messages, conversationId, term } = req.body
+  let { messages, conversationId, term, model } = req.body
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages array is required' })
   }
@@ -26,6 +26,7 @@ router.post('/stream', async function (req, res) {
   let body = { messages }
   if (conversationId) body.conversationId = conversationId
   if (term) body.term = term
+  if (model) body.model = model
 
   try {
     let upstream = await fetch(gatewayURL, {

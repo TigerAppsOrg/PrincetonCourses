@@ -250,7 +250,13 @@
       <div id="chat-pane" class="flex-container-col slide" style="display: none;">
         <div id="chat-header" class="flex-item-rigid">
           <span id="ai-bot-dot"></span>
-          <strong>AI Course Assistant</strong>
+          <select id="chat-model-select" title="Select AI model">
+            <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
+            <option value="moonshotai/kimi-k2-thinking">Kimi K2.5 Thinking</option>
+            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4.6</option>
+            <option value="anthropic/claude-sonnet-4:thinking">Claude Sonnet Thinking</option>
+            <option value="google/gemini-3.1-flash-lite">Gemini Flash Lite</option>
+          </select>
           <div id="chat-header-actions">
             <button id="chat-new-convo" title="New conversation">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
