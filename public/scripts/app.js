@@ -15,6 +15,7 @@ $(document).ready(function() {
   init_display();
   init_evals();
   init_suggest();
+  init_chat();
   //init_updates(); // BENSU: Enable to show update popup, but keep the popup information below updated by changing the text and the popup number
 })
 
@@ -88,6 +89,17 @@ var init_panes = function() {
   $('#suggest-pane').resizable({
     handleSelector: "#suggest-resizer",
     resizeHeight: false
+  })
+
+  var chatPaneWidth = localStorage.getItem('#chat-resizer')
+  if (chatPaneWidth !== undefined) {
+    $('#chat-pane').css('width', chatPaneWidth)
+  }
+
+  $('#chat-pane').resizable({
+    handleSelector: '#chat-resizer',
+    resizeHeight: false,
+    resizeWidthFrom: 'left'
   })
 }
 

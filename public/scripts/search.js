@@ -254,6 +254,10 @@ function newDOMcourseResult(course, props) {
   var dot = ''
   if (course.hasOwnProperty('open')) dot = newHTMLlock(course)
 
+  // build a summary string for Ask AI context
+  var courseLabel = newHTMLlistings(course).replace(/<[^>]*>/g, '')
+  var askAiIcon = '<i class="fa fa-lg fa-diamond ask-ai-icon" data-course-label="' + courseLabel + '" data-course-title="' + (course.title || '').replace(/"/g, '&quot;') + '" data-toggle="tooltip" data-original-title="Ask AI about this course"></i>'
+
   // html string for the DOM object
   var htmlString = (
     '<li class="list-group-item search-result">'
@@ -264,6 +268,7 @@ function newDOMcourseResult(course, props) {
       + '</div>'
       + '<div class="flex-item-rigid">'
         + '&nbsp;'
+        + askAiIcon + ' '
         + pinIcon + ' '
         + clashIcon + ' '
         + newHTMLfavIcon(course._id) + ' '
@@ -290,6 +295,19 @@ function newDOMcourseResult(course, props) {
     var pin = $(entry).find('i.fa-thumb-tack')[0]
     pin.courseId = course._id
     $(pin).click(togglePin)
+  }
+
+  // bind Ask AI icon
+  var aiIcon = $(entry).find('.ask-ai-icon')[0]
+  if (aiIcon) {
+    $(aiIcon).click(function (e) {
+      e.stopPropagation()
+      var label = $(this).data('course-label')
+      var title = $(this).data('course-title')
+      var prompt = 'Tell me about ' + label + ' (' + title + '). What is the workload like? How are the evaluations?'
+      if (!$('#chat-pane').is(':visible')) toggleChat()
+      sendChatMessage(prompt)
+    })
   }
 
   return entry
