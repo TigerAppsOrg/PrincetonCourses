@@ -27,6 +27,8 @@ router.post('/stream', async function (req, res) {
   if (conversationId) body.conversationId = conversationId
   if (term) body.term = term
   if (model) body.model = model
+  // Inject CAS NetID server-side for TigerJunction schedule access
+  if (user._id) body.netid = user._id
 
   try {
     let upstream = await fetch(gatewayURL, {
