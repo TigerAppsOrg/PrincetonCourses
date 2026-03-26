@@ -7,6 +7,7 @@ require('dotenv').config()
 // Load external dependencies
 const log = require('loglevel')
 const cheerio = require('cheerio')
+const mongoose = require('mongoose')
 const spawn = require('child_process').spawn
 
 // Set the level of the logger to the first command line argument
@@ -87,21 +88,38 @@ var loadCoursesFromRegistrar = function (query, externalCallback) {
     res += data.toString('utf8')
   })
   pythonMobileAppManager.stdout.on('end', function () {
-    externalCallback(JSON.parse(res))
+    Promise.resolve().then(function () {
+      return externalCallback(JSON.parse(res))
+    }).catch(function (error) {
+      console.log(error)
+      process.exit(1)
+    })
   })
   pythonMobileAppManager.on('error', function (error) {
     console.log(error)
   })
 }
 
-var importDataFromRegistrar = function (data) {
+var importDataFromRegistrar = async function (data) {
   console.log('Processing data recieved from MobileApp API.')
-  data.term[0].code = Number(data.term[0].code)
+  for (var termIndex in data.term) {
+    data.term[termIndex].code = Number(data.term[termIndex].code)
+  }
 
   for (var termIndex in data.term) {
     var term = data.term[termIndex]
-    importTerm(term)
+    await importTerm(term)
   }
+
+  console.log('All courses successfully processed.')
+
+  try {
+    await mongoose.connection.close()
+  } catch (error) {
+    console.log(error)
+  }
+
+  process.exit(0)
 }
 
 // Recieve a "term" of data (of the kind produced by MobileApp API) and add/update the database to contain this data
@@ -125,9 +143,24 @@ var importTerm = async function (term) {
     log.trace('Creating or updating the semester %s succeeded.', term.cal_name)
 
     // Process each subject within this semester
+    const pendingCourseImports = []
     for (var subjectIndex in term.subjects) {
       var subject = term.subjects[subjectIndex]
-      await importSubject(semester, subject)
+      pendingCourseImports.push(...importSubject(semester, subject))
+    }
+
+    console.log('Queued %d course detail requests for the %s semester.', pendingCourseImports.length, term.cal_name)
+
+    const importResults = await Promise.allSettled(pendingCourseImports)
+    const failedImports = importResults.filter(function (result) {
+      return result.status === 'rejected'
+    })
+
+    if (failedImports.length > 0) {
+      console.warn('Failed to process %d courses in the %s semester.', failedImports.length, term.cal_name)
+      failedImports.slice(0, 5).forEach(function (result) {
+        console.warn(result.reason)
+      })
     }
   } catch (error) {
     log.warn('Creating or updating the semester %s failed.', term.cal_name)
@@ -139,176 +172,163 @@ var decodeEscapedCharacters = function (html) {
   return cheerio.load('<div>' + cheerio.load('<div>' + html + '</div>').text() + '</div>').text()
 }
 
-var importSubject = async function (semester, subject) {
+var importCourse = async function (semester, subjectCode, courseData) {
+  if (typeof (courseData.catalog_number) === 'undefined' || courseData.catalog_number.length < 2) {
+    return
+  }
+
+  // Decode escaped HTML characters in the course title
+  if (typeof (courseData.title) !== 'undefined') {
+    courseData.title = decodeEscapedCharacters(courseData.title)
+  }
+
+  // Decode escaped HTML characters in the course description
+  if (typeof (courseData.detail.description) !== 'undefined') {
+    courseData.detail.description = decodeEscapedCharacters(courseData.detail.description)
+  }
+
+  const requestUrl = `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`
+  const requestHeaders = {
+    Pragma: 'no-cache',
+    Accept: 'application/json',
+    Authorization: `Bearer ${registrarFrontEndAPIToken}`,
+    'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
+  }
+
+  try {
+    var response = await throttledFetch(requestUrl, { headers: requestHeaders })
+  } catch (error) {
+    console.log(error)
+    return
+  }
+
+  console.log(`Got results for ${courseData.course_id}`)
+
+  // Ensure valid response shape from registrar API
+  if (!response || response.status !== 200) {
+    console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.status}`)
+    return
+  }
+
+  let parsed
+  try {
+    parsed = await response.json()
+  } catch (e) {
+    console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
+    return
+  }
+
+  const detailsRoot = parsed && parsed.course_details
+  const detailsArr = detailsRoot && detailsRoot.course_detail
+  if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
+    console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
+    return
+  }
+
+  let frontEndApiCourseDetails = detailsArr[0]
+
+  // Grading Basis
+  switch (frontEndApiCourseDetails.grading_basis) {
+    case 'FUL': // Graded A-F, P/D/F, Audit
+      courseData.pdf = { required: false, permitted: true }
+      courseData.audit = true
+      break
+    case 'NAU': // No Audit
+      courseData.pdf = { required: false, permitted: true }
+      courseData.audit = false
+      break
+    case 'GRD': // na, npdf
+      courseData.pdf = { required: false, permitted: false }
+      courseData.audit = false
+      break
+    case 'NPD': // No Pass/D/Fail
+      courseData.pdf = { required: false, permitted: false }
+      courseData.audit = true
+      break
+    case 'PDF': // P/D/F Only
+      courseData.pdf = { required: true, permitted: true }
+      courseData.audit = true
+      break
+    default:
+      courseData.pdf = { required: false, permitted: true }
+      courseData.audit = true
+  }
+
+  // Get Grading
+  courseData.grading = Object.keys(frontEndApiCourseDetails).filter(function (key) {
+    return assignmentPropertyNames.includes(key)
+  }).filter(function (key) {
+    return frontEndApiCourseDetails[key] !== '0'
+  }).map(function (key) {
+    return {
+      component: assignmentMapping[key],
+      weight: parseFloat(frontEndApiCourseDetails[key])
+    }
+  }).sort(function (a, b) {
+    if (a.weight < b.weight) return 1
+    if (a.weight > b.weight) return -1
+    return 0
+  })
+
+  // Get assignments description
+  if (frontEndApiCourseDetails.reading_writing_assignment && frontEndApiCourseDetails.reading_writing_assignment.trim().length > 0) {
+    courseData.assignments = frontEndApiCourseDetails.reading_writing_assignment.trim()
+  }
+
+  // Get reserved seats
+  if (frontEndApiCourseDetails.seat_reservations.seat_reservation) {
+    courseData.reservedSeats = frontEndApiCourseDetails.seat_reservations.seat_reservation.map(function (reservation) {
+      return `${reservation.description} ${reservation.enrl_cap}`
+    })
+  }
+
+  // Get reading list
+  let readingList = []
+  for (let i = 1; i <= 6; i++) {
+    let title = frontEndApiCourseDetails[`reading_list_title_${i}`]
+    if (title && title.trim().length > 0) {
+      let reading = { title: title.trim() }
+      let author = frontEndApiCourseDetails[`reading_list_author_${i}`]
+      if (author && author.trim().length > 0) {
+        reading.author = author.trim()
+      }
+      readingList.push(reading)
+    }
+  }
+  if (readingList.length > 0) {
+    courseData.readingList = readingList
+  }
+
+  // Get prerequisites and restrictions
+  courseData.prerequisites = frontEndApiCourseDetails.other_restrictions
+
+  // Get other information
+  courseData.otherinformation = frontEndApiCourseDetails.other_information
+
+  // Get other requirements
+  courseData.otherrequirements = frontEndApiCourseDetails.other_requirements
+
+  // Get website
+  courseData.website = frontEndApiCourseDetails.web_address
+
+  // Get distribution requirements
+  courseData.distribution_area = frontEndApiCourseDetails.distribution_area_short
+
+  await courseModel.createCourse(semester, subjectCode, courseData)
+}
+
+var importSubject = function (semester, subject) {
   log.debug('Processing the subject %s in the %s semester.', subject.code, semester.name)
+  const pendingCourseImports = []
 
   // Iterate over the courses in this subject
   for (var courseIndex in subject.courses) {
     const courseData = subject.courses[courseIndex]
-
-    if (typeof (courseData.catalog_number) === 'undefined' || courseData.catalog_number.length < 2) {
-      continue
-    }
-
-    // Decode escaped HTML characters in the course title
-    if (typeof (courseData.title) !== 'undefined') {
-      courseData.title = decodeEscapedCharacters(courseData.title)
-    }
-
-    // Decode escaped HTML characters in the course description
-    if (typeof (courseData.detail.description) !== 'undefined') {
-      courseData.detail.description = decodeEscapedCharacters(courseData.detail.description)
-    }
-
-    const requestUrl = `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`
-    const requestHeaders = {
-      Pragma: 'no-cache',
-      Accept: 'application/json',
-      Authorization: `Bearer ${registrarFrontEndAPIToken}`,
-      'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
-    }
-
-    // Increment the number of courses pending processing
-    coursesPendingProcessing++
-
-    try {
-      var response = await throttledFetch(requestUrl, { headers: requestHeaders })
-    } catch (error) {
-      coursesPendingProcessing--
-      console.log(error)
-      continue
-    }
-
-    console.log(`Got results for ${courseData.course_id}`)
-
-    // Ensure valid response shape from registrar API
-    if (!response || response.status !== 200) {
-      console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.status}`)
-      coursesPendingProcessing--
-      continue
-    }
-
-    let parsed
-    try {
-      parsed = await response.json()
-    } catch (e) {
-      console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
-      coursesPendingProcessing--
-      continue
-    }
-
-    const detailsRoot = parsed && parsed.course_details
-    const detailsArr = detailsRoot && detailsRoot.course_detail
-    if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
-      console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
-      coursesPendingProcessing--
-      continue
-    }
-
-    let frontEndApiCourseDetails = detailsArr[0]
-
-    // Grading Basis
-    switch (frontEndApiCourseDetails.grading_basis) {
-      case 'FUL': // Graded A-F, P/D/F, Audit
-        courseData.pdf = { required: false, permitted: true }
-        courseData.audit = true
-        break
-      case 'NAU': // No Audit
-        courseData.pdf = { required: false, permitted: true }
-        courseData.audit = false
-        break
-      case 'GRD': // na, npdf
-        courseData.pdf = { required: false, permitted: false }
-        courseData.audit = false
-        break
-      case 'NPD': // No Pass/D/Fail
-        courseData.pdf = { required: false, permitted: false }
-        courseData.audit = true
-        break
-      case 'PDF': // P/D/F Only
-        courseData.pdf = { required: true, permitted: true }
-        courseData.audit = true
-        break
-      default:
-        courseData.pdf = { required: false, permitted: true }
-        courseData.audit = true
-    }
-
-    // Get Grading
-    courseData.grading = Object.keys(frontEndApiCourseDetails).filter(function (key) {
-      return assignmentPropertyNames.includes(key)
-    }).filter(function (key) {
-      return frontEndApiCourseDetails[key] !== '0'
-    }).map(function (key) {
-      return {
-        component: assignmentMapping[key],
-        weight: parseFloat(frontEndApiCourseDetails[key])
-      }
-    }).sort(function (a, b) {
-      if (a.weight < b.weight) return 1
-      if (a.weight > b.weight) return -1
-      return 0
-    })
-
-    // Get assignments description
-    if (frontEndApiCourseDetails.reading_writing_assignment && frontEndApiCourseDetails.reading_writing_assignment.trim().length > 0) {
-      courseData.assignments = frontEndApiCourseDetails.reading_writing_assignment.trim()
-    }
-
-    // Get reserved seats
-    if (frontEndApiCourseDetails.seat_reservations.seat_reservation) {
-      courseData.reservedSeats = frontEndApiCourseDetails.seat_reservations.seat_reservation.map(function (reservation) {
-        return `${reservation.description} ${reservation.enrl_cap}`
-      })
-    }
-
-    // Get reading list
-    let readingList = []
-    for (let i = 1; i <= 6; i++) {
-      let title = frontEndApiCourseDetails[`reading_list_title_${i}`]
-      if (title && title.trim().length > 0) {
-        let reading = { title: title.trim() }
-        let author = frontEndApiCourseDetails[`reading_list_author_${i}`]
-        if (author && author.trim().length > 0) {
-          reading.author = author.trim()
-        }
-        readingList.push(reading)
-      }
-    }
-    if (readingList.length > 0) {
-      courseData.readingList = readingList
-    }
-
-    // Get prerequisites and restrictions
-    courseData.prerequisites = frontEndApiCourseDetails.other_restrictions
-
-    // Get other information
-    courseData.otherinformation = frontEndApiCourseDetails.other_information
-
-    // Get other requirements
-    courseData.otherrequirements = frontEndApiCourseDetails.other_requirements
-
-    // Get website
-    courseData.website = frontEndApiCourseDetails.web_address
-
-    // Get distribution requirements
-    courseData.distribution_area = frontEndApiCourseDetails.distribution_area_short
-
-    await courseModel.createCourse(semester, subject.code, courseData)
-
-    // Decrement the number of courses pending processing
-    coursesPendingProcessing--
-
-    // If there are no courses pending processing, we should quit
-    if (coursesPendingProcessing === 0) {
-      console.log('All courses successfully processed.')
-      process.exit()
-    }
+    pendingCourseImports.push(importCourse(semester, subject.code, courseData))
   }
-}
 
-// Initialise a counter of the number of courses pending being added to the database
-var coursesPendingProcessing = 0
+  return pendingCourseImports
+}
 
 // Get queryString from command line args
 var queryString = ''
