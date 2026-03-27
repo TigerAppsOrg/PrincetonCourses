@@ -160,33 +160,46 @@ function loadConversation (convId) {
 // then renders it using the same newDOMcourseResult function as the left-side results.
 // Clicking opens the course in the middle pane — identical to clicking a search result.
 
-function renderCourseCardInChat (containerId, courseData) {
+function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (!courseData || !courseData.code) return false
 
-  // Extract a clean search code (first listing, no spaces)
+  // Extract a clean search code — e.g. "COS 217 / EGR 217" → "COS217"
   var code = courseData.code || ''
   var searchCode = code.split(/\s*\/\s*/)[0].replace(/\s+/g, '')
 
-  // Fetch the real course object from PrincetonCourses MongoDB
-  $.get('/api/search?query=' + encodeURIComponent(searchCode), function (results) {
-    if (!results || results.length === 0) return
+  // Show a loading state on the tool card while we fetch
+  if (toolDomId) markToolDone(toolDomId)
 
-    var course = results[0]
+  // Fetch the real course object from PrincetonCourses MongoDB
+  $.post('/api/search/' + encodeURIComponent(searchCode), function (results) {
+    if (!results || !results.courses || results.courses.length === 0) return
+
+    var course = results.courses[0]
     // Use the existing renderer — produces identical card to the left side
     var entry = newDOMcourseResult(course, { tags: 1, semester: 1 })
 
-    // Wrap it for chat styling
-    var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
-    $(entry).addClass('chat-inline-course')
-    wrapper.append(entry)
-    $('#' + containerId + '-body').append(wrapper)
+    // Remove the Ask AI diamond icon from chat-rendered cards
+    $(entry).find('.ask-ai-icon').remove()
+
+    // Replace the tool card with the course card
+    if (toolDomId) {
+      var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
+      $(entry).addClass('chat-inline-course')
+      wrapper.append(entry)
+      $('#' + toolDomId).replaceWith(wrapper)
+    } else {
+      var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
+      $(entry).addClass('chat-inline-course')
+      wrapper.append(entry)
+      $('#' + containerId + '-body').append(wrapper)
+    }
     scrollChatToBottom()
   })
 
   return true  // return true immediately to suppress the raw JSON preview
 }
 
-function tryRenderCourseCard (containerId, toolName, data) {
+function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
   if (toolName !== 'get_course_details') return false
   if (!data || !data.result || !data.result.content) return false
   for (var i = 0; i < data.result.content.length; i++) {
@@ -194,7 +207,7 @@ function tryRenderCourseCard (containerId, toolName, data) {
       try {
         var parsed = JSON.parse(data.result.content[i].text)
         if (parsed.code) {
-          return renderCourseCardInChat(containerId, parsed)
+          return renderCourseCardInChat(containerId, parsed, toolDomId)
         }
       } catch (_) {}
     }
@@ -681,10 +694,8 @@ function sendChatMessage (text) {
           }
           if (matchedPart && matchedPart.domId) {
             // Try to render a course card for get_course_details — replaces the tool card
-            var renderedCard = tryRenderCourseCard(containerId, resultName, data)
-            if (renderedCard) {
-              $('#' + matchedPart.domId).remove()
-            } else {
+            var renderedCard = tryRenderCourseCard(containerId, resultName, data, matchedPart.domId)
+            if (!renderedCard) {
               markToolDone(matchedPart.domId)
             }
             if (!renderedCard && data && data.result && data.result.content) {
