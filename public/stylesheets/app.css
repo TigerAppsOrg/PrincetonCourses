@@ -509,18 +509,34 @@ body {
   z-index: 0;
 }
 
-/* Feature cards */
-@media (min-width: 992px) {
-  .row-md-flex {
-    display: flex;
-  }
+/* Feature cards - flex-based, responds to container width */
+.welcome-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 20px 30px;
+}
+.welcome-card-item {
+  flex: 1 1 140px;
+  min-width: 120px;
+  background: #f4f4f4;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.welcome-card-item h4 {
+  margin: 8px 0 6px;
+  font-size: 0.95em;
+}
+.welcome-card-item p {
+  font-size: 0.85em;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
 }
 
 @media (max-width: 767px) {
-  .col-xs-welcome {
-    max-width: 300px;
-    margin: 0 auto;
-  }
   .welcome-container {
     padding: 20px 16px 10px;
   }
@@ -529,6 +545,9 @@ body {
   }
   .welcome-img {
     max-width: 260px;
+  }
+  .welcome-cards {
+    margin: 20px 10px;
   }
 }
 
