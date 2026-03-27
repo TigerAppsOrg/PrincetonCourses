@@ -175,10 +175,14 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
   $.post('/api/search/' + encodeURIComponent(searchCode), function (results) {
     if (!results || !Array.isArray(results) || results.length === 0) return
 
-    // Find the first course result (skip instructor results)
+    // Find the most recent course result (highest semester._id = most recent term)
     var course = null
     for (var ri = 0; ri < results.length; ri++) {
-      if (results[ri].type === 'course') { course = results[ri]; break }
+      if (results[ri].type === 'course') {
+        if (!course || (results[ri].semester && course.semester && results[ri].semester._id > course.semester._id)) {
+          course = results[ri]
+        }
+      }
     }
     if (!course) return
     // Use the existing renderer — produces identical card to the left side
