@@ -5,7 +5,7 @@
   <%-
   <!-- // Include page-specific scripts and stylesheets with a per-deploy cache-buster -->
   include('../partials/staticResources.ejs', {
-    scripts: ['logout', 'demo', 'history', 'layout', 'resizable', 'feedback', 'navbar', 'icon', 'eval', 'fav', 'pin', 'display', 'suggest', 'search', 'app'],
+    scripts: ['logout', 'demo', 'history', 'layout', 'resizable', 'feedback', 'navbar', 'icon', 'eval', 'fav', 'pin', 'display', 'suggest', 'chat', 'search', 'app'],
     stylesheets: ['app', 'demo', 'navbar', 'feedback', 'scrollbar'],
     release: 'v' + (Math.floor(Math.random() * 999999) + 500)
   })
@@ -45,6 +45,7 @@
           <li id="feedback-toggle"><a href="#">Feedback</a></li>
           <li id="netid"><a href="#"><%= netid %></a></li>
           <li id="logout" class="active" style="display:none;"><a href="/auth/logout">Logout</a></li>
+          <li id="chat-toggle"><a href="#"><span id="ask-ai-btn"><span class="ask-ai-sparkle">&#10024;</span> ASK AI</span></a></li>
         </ul>
       </div>
     </nav>
@@ -241,6 +242,54 @@
         <div id="display-initial" class="flex-item-stretch">
           <!-- MEL: any initial stuff goes here -->
           <% include ../partials/welcomepage.ejs %>
+        </div>
+      </div>
+      <div id="chat-resizer" class="flex-item-rigid resizer-inactive"></div>
+      <div id="chat-pane" class="flex-container-col slide" style="display: none;">
+        <div id="chat-header" class="flex-item-rigid">
+          <div id="chat-quota-display">
+            <div id="chat-usage-bar">
+              <div id="chat-usage-fill" style="width: 0%"></div>
+            </div>
+            <span id="chat-usage-pct">0%</span>
+            <span id="chat-usage-label">Sonnet 4.6</span>
+          </div>
+          <div id="chat-header-actions">
+            <button id="chat-history-btn" title="Chat history" onclick="toggleHistoryPanel()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </button>
+            <button id="chat-new-convo" title="New conversation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <button id="chat-close-btn" onclick="toggleChat()" title="Close chat">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div id="chat-history-panel" style="display:none;">
+          <div id="chat-history-list">
+            <!-- populated by chat.js -->
+          </div>
+        </div>
+        <div id="chat-messages" class="flex-item-stretch">
+          <!-- messages appear here -->
+        </div>
+        <div id="chat-prompts-area" class="flex-item-rigid">
+          <div class="chat-prompts-label">Suggestions</div>
+          <div id="chat-prompt-chips">
+            <!-- chips are rendered by chat.js -->
+          </div>
+        </div>
+        <div id="chat-text-box" class="flex-item-rigid">
+          <div id="chat-input-row">
+            <textarea id="chat-ta" rows="1" oninput="autoResize(this)" placeholder="Ask about courses, workload, prereqs..."></textarea>
+            <button id="chat-send-btn" title="Send message">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+            <button id="chat-stop-btn" title="Stop generating" style="display: none;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="none"><rect x="2" y="2" width="20" height="20" rx="2"></rect></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -40,6 +40,7 @@ router.use('/user/clashDetectionCourses', require('./endpoints/clashDetectionCou
 router.use('/evaluations', require('./endpoints/evaluations.js'))
 router.use('/departments', require('./endpoints/departments.js'))
 router.use('/semesters', require('./endpoints/semesters.js'))
+router.use('/ask-ai', require('./endpoints/askai.js'))
 
 // Export the routes on this router
 module.exports.router = router

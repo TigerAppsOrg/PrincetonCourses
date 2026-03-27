@@ -22,3 +22,7 @@ module.exports.sessionSecret = process.env.SESSION_SECRET || 'abcdefghijklmnop'
 
 // Chatbot API key
 module.exports.chatbotAPIKey = process.env.CHATBOT_API_KEY
+
+// Ask Gateway (AI chat)
+module.exports.askGatewayURL = process.env.ASK_GATEWAY_URL || 'http://localhost:8010'
+module.exports.askGatewayToken = process.env.ASK_GATEWAY_TOKEN || ''
