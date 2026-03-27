@@ -13,14 +13,17 @@ var chatState = {
 function updateUsageBar (percent, tier) {
   var fill = document.getElementById('chat-usage-fill')
   var label = document.getElementById('chat-usage-label')
+  var pctEl = document.getElementById('chat-usage-pct')
   if (!fill || !label) return
-  fill.style.width = Math.min(100, Math.max(0, percent)) + '%'
+  var pct = Math.min(100, Math.max(0, Math.round(percent)))
+  fill.style.width = pct + '%'
   fill.className = ''
-  if (percent >= 90 || tier === 'exhausted') {
+  if (pct >= 90 || tier === 'exhausted') {
     fill.className = 'usage-high'
-  } else if (percent >= 60) {
+  } else if (pct >= 60) {
     fill.className = 'usage-mid'
   }
+  if (pctEl) pctEl.textContent = pct + '%'
   if (tier === 1) label.textContent = 'Sonnet 4.6'
   else if (tier === 2) label.textContent = 'Haiku 4.5'
   else if (tier === 'exhausted') label.textContent = 'Limit reached'

@@ -941,6 +941,15 @@ body {
 #chat-usage-fill.usage-high {
   background: #d9534f;
 }
+#chat-usage-pct {
+  font-family: "Open Sans", -apple-system, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  min-width: 22px;
+  text-align: right;
+}
 #chat-usage-label {
   font-family: "Open Sans", -apple-system, sans-serif;
   font-size: 0.7rem;
