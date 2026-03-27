@@ -565,8 +565,8 @@ function showErrorInChat (msg) {
 function updateSuggestionChips () {
   var chips = [
     { icon: '\uD83D\uDCCB', text: 'Based on my TigerJunction schedule, what courses do you recommend I take next?' },
-    { icon: '\uD83D\uDD0D', text: 'Find VIS classes that take place only on Mondays' },
-    { icon: '\u2B50', text: 'What are the highest rated courses with no final exam?' }
+    { icon: '\uD83D\uDD0D', text: 'Find VIS classes that take place only on Mondays, look into each of them' },
+    { icon: '\u2B50', text: 'Good LA courses with no final exam?' }
   ]
   var container = document.getElementById('chat-prompt-chips')
   if (!container) return
