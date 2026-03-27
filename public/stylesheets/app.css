@@ -535,6 +535,11 @@ body {
   margin: 0;
   line-height: 1.4;
 }
+.welcome-card-icon {
+  font-size: 1.8em !important;
+  color: #EE7F2D;
+  margin-bottom: 4px;
+}
 
 @media (max-width: 767px) {
   .welcome-container {
