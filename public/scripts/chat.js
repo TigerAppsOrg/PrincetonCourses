@@ -156,82 +156,34 @@ function loadConversation (convId) {
 }
 
 // --- Course Card Rendering ---
-// Builds a course card matching the left-side search result style.
-// Clicking it calls displayCourseDetails to open the course in the middle pane.
+// Fetches the real PrincetonCourses course object from MongoDB via the search API,
+// then renders it using the same newDOMcourseResult function as the left-side results.
+// Clicking opens the course in the middle pane — identical to clicking a search result.
 
 function renderCourseCardInChat (containerId, courseData) {
   if (!courseData || !courseData.code) return false
 
+  // Extract a clean search code (first listing, no spaces)
   var code = courseData.code || ''
-  var title = courseData.title || ''
-  var dists = courseData.dists || []
-  var status = courseData.status || ''
-  var rating = courseData.latestRating || courseData.rating || null
+  var searchCode = code.split(/\s*\/\s*/)[0].replace(/\s+/g, '')
 
-  // Build a fake course object compatible with icon.js helpers
-  var parts = code.split(/\s*\/\s*/)[0].match(/^([A-Za-z]+)\s*(\d+.*)$/)
-  var dept = parts ? parts[1].toUpperCase() : ''
-  var catNum = parts ? parts[2] : ''
-  var fakeCourse = {
-    department: dept,
-    catalogNumber: catNum,
-    distribution: (dists || []).join(','),
-    crosslistings: [],
-    pdf: {},
-    title: title
-  }
+  // Fetch the real course object from PrincetonCourses MongoDB
+  $.get('/api/search?query=' + encodeURIComponent(searchCode), function (results) {
+    if (!results || results.length === 0) return
 
-  // Use existing helper if available, else build manually
-  var listingHtml = (typeof newHTMLlistings === 'function')
-    ? newHTMLlistings(fakeCourse)
-    : '<strong>' + escapeHtml(code) + '</strong>'
-  var tagsHtml = (typeof newHTMLtags === 'function')
-    ? '<small>' + newHTMLtags(fakeCourse) + '</small>'
-    : ''
-  var scoreHtml = ''
-  if (rating && typeof newHTMLscoreBadge === 'function') {
-    fakeCourse.scores = { 'Quality of Course': rating }
-    scoreHtml = newHTMLscoreBadge(fakeCourse)
-  }
+    var course = results[0]
+    // Use the existing renderer — produces identical card to the left side
+    var entry = newDOMcourseResult(course, { tags: 1, semester: 1 })
 
-  // Lock icon for open/closed
-  var lockHtml = ''
-  if (status === 'closed' || status === 'open') {
-    fakeCourse.open = (status === 'open')
-    if (typeof newHTMLlock === 'function') lockHtml = newHTMLlock(fakeCourse)
-  }
-
-  var cardHtml =
-    '<div class="chat-course-card-wrapper chat-animate-in">' +
-    '<li class="list-group-item search-result chat-inline-course">' +
-      '<div class="flex-container-row">' +
-        '<div class="flex-item-stretch truncate">' +
-          lockHtml + ' <strong>' + listingHtml + '</strong> ' + tagsHtml +
-        '</div>' +
-        '<div class="flex-item-rigid">' +
-          '&nbsp;' + scoreHtml +
-        '</div>' +
-      '</div>' +
-      '<div class="flex-container-row">' +
-        '<div class="flex-item-stretch truncate">' + escapeHtml(title) + '</div>' +
-      '</div>' +
-    '</li>' +
-    '</div>'
-
-  var el = $(cardHtml)
-  // On click, search for course by code to get the PrincetonCourses _id, then display it
-  var searchCode = dept + catNum
-  el.find('.search-result').css('cursor', 'pointer').on('click', function () {
-    $.get('/api/search?query=' + encodeURIComponent(searchCode), function (results) {
-      if (results && results.length > 0) {
-        displayCourseDetails(results[0]._id, false)
-      }
-    })
+    // Wrap it for chat styling
+    var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
+    $(entry).addClass('chat-inline-course')
+    wrapper.append(entry)
+    $('#' + containerId + '-body').append(wrapper)
+    scrollChatToBottom()
   })
 
-  $('#' + containerId + '-body').append(el)
-  scrollChatToBottom()
-  return true
+  return true  // return true immediately to suppress the raw JSON preview
 }
 
 function tryRenderCourseCard (containerId, toolName, data) {
