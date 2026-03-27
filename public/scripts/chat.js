@@ -52,6 +52,89 @@ function fetchQuotaStatus () {
   }).catch(function () {})
 }
 
+// --- Chat History ---
+
+function toggleHistoryPanel () {
+  var panel = document.getElementById('chat-history-panel')
+  if (!panel) return
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block'
+    fetchConversations()
+  } else {
+    panel.style.display = 'none'
+  }
+}
+
+function fetchConversations () {
+  fetch('/api/ask-ai/conversations').then(function (res) {
+    if (!res.ok) return
+    return res.json()
+  }).then(function (convs) {
+    if (convs) renderConversationList(convs)
+  }).catch(function () {})
+}
+
+function renderConversationList (conversations) {
+  var container = document.getElementById('chat-history-list')
+  if (!container) return
+  if (!conversations || conversations.length === 0) {
+    container.innerHTML = '<div class="chat-history-empty">No previous chats</div>'
+    return
+  }
+  var html = ''
+  for (var i = 0; i < conversations.length; i++) {
+    var c = conversations[i]
+    var timeAgo = formatTimeAgo(c.updated_at)
+    html += '<div class="chat-history-item" onclick="loadConversation(\'' + escapeHtml(c.id) + '\')">' +
+      '<span class="chat-history-title">' + escapeHtml(c.title) + '</span>' +
+      '<span class="chat-history-time">' + escapeHtml(timeAgo) + '</span>' +
+      '</div>'
+  }
+  container.innerHTML = html
+}
+
+function formatTimeAgo (dateStr) {
+  if (!dateStr) return ''
+  var diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago'
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago'
+  return Math.floor(diff / 86400) + 'd ago'
+}
+
+function loadConversation (convId) {
+  // Hide history panel
+  var panel = document.getElementById('chat-history-panel')
+  if (panel) panel.style.display = 'none'
+
+  fetch('/api/ask-ai/conversations/' + encodeURIComponent(convId) + '/messages').then(function (res) {
+    if (!res.ok) throw new Error('Failed to load')
+    return res.json()
+  }).then(function (messages) {
+    // Restore chatState
+    chatState.messages = []
+    chatState.conversationId = convId
+    chatState.userToggledThinking = false
+    $('#chat-messages').empty()
+    $('#chat-prompts-area').slideUp(0)
+
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i]
+      chatState.messages.push({ role: m.role, content: m.content })
+      if (m.role === 'user') {
+        appendUserMessage(m.content)
+      } else if (m.role === 'assistant') {
+        var cid = createAssistantContainer()
+        var tid = appendTextBlock(cid)
+        document.getElementById(tid).innerHTML = renderMarkdown(m.content)
+      }
+    }
+    scrollChatToBottom()
+  }).catch(function (err) {
+    showErrorInChat('Failed to load conversation')
+  })
+}
+
 // --- Toggle & Layout ---
 
 function toggleChat () {

@@ -82,6 +82,41 @@ router.post('/stream', async function (req, res) {
   }
 })
 
+router.get('/conversations', async function (req, res) {
+  let user = res.locals.user
+  if (!user) return res.status(401).json({ error: 'Authentication required' })
+
+  let url = config.askGatewayURL + '/ask/conversations?netid=' + encodeURIComponent(user._id)
+  let headers = {}
+  if (config.askGatewayToken) headers['Authorization'] = 'Bearer ' + config.askGatewayToken
+
+  try {
+    let upstream = await fetch(url, { headers })
+    let data = await upstream.json()
+    res.json(data)
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to get conversations', detail: err.message })
+  }
+})
+
+router.get('/conversations/:id/messages', async function (req, res) {
+  let user = res.locals.user
+  if (!user) return res.status(401).json({ error: 'Authentication required' })
+
+  let url = config.askGatewayURL + '/ask/conversations/' + encodeURIComponent(req.params.id) + '/messages?netid=' + encodeURIComponent(user._id)
+  let headers = {}
+  if (config.askGatewayToken) headers['Authorization'] = 'Bearer ' + config.askGatewayToken
+
+  try {
+    let upstream = await fetch(url, { headers })
+    if (!upstream.ok) return res.status(upstream.status).json({ error: 'Not found' })
+    let data = await upstream.json()
+    res.json(data)
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to get messages', detail: err.message })
+  }
+})
+
 router.get('/quota', async function (req, res) {
   let user = res.locals.user
   if (!user) {
