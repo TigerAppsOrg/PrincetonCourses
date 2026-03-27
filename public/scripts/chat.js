@@ -174,13 +174,20 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
 
     // Pick the most recent offering
     // _id encodes semester in first 4 digits (e.g., 1272007996 = Fall 2026 + course 007996)
-    // Sort by _id descending as numbers — highest _id = most recent semester
     courses.sort(function (a, b) { return Number(b._id) - Number(a._id) })
     var course = courses[0]
+    console.log('[chat] Course card: picked _id=' + course._id + ' semester=' + course.semester + ' from ' + courses.length + ' results. Top 3:', courses.slice(0, 3).map(function (c) { return c._id + '(sem=' + c.semester + ')' }))
 
     // Render using existing card function — don't show semester text
     var entry = newDOMcourseResult(course, { tags: 1 })
     $(entry).find('.ask-ai-icon').remove()
+
+    // Override click handler — newDOMcourseResult may bind to wrong _id
+    var correctId = course._id
+    $(entry).off('click').on('click', function () {
+      displayCourseDetails(correctId, false)
+      return false
+    })
 
     var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
     $(entry).addClass('chat-inline-course')
