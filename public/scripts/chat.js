@@ -175,16 +175,15 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
   $.getJSON('/api/search/' + encodeURIComponent(searchCode), function (results) {
     if (!results || !Array.isArray(results) || results.length === 0) return
 
-    // Find the most recent course result (highest semester._id = most recent term)
-    var course = null
+    // Find the most recent course result (highest _id = most recently added to DB)
+    var courseResults = []
     for (var ri = 0; ri < results.length; ri++) {
-      if (results[ri].type === 'course') {
-        if (!course || (results[ri].semester && course.semester && results[ri].semester._id > course.semester._id)) {
-          course = results[ri]
-        }
-      }
+      if (results[ri].type === 'course') courseResults.push(results[ri])
     }
-    if (!course) return
+    if (courseResults.length === 0) return
+    // Sort by _id descending — MongoDB ObjectIds/numeric IDs are chronological
+    courseResults.sort(function (a, b) { return b._id - a._id })
+    var course = courseResults[0]
     // Use the existing renderer — produces identical card to the left side
     var entry = newDOMcourseResult(course, { tags: 1, semester: 1 })
 
