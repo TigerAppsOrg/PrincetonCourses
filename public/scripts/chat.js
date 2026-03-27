@@ -155,14 +155,6 @@ function loadConversation (convId) {
   })
 }
 
-function chatTermCodeToName (code) {
-  if (!code) return ''
-  var semester = code % 10 === 2 ? 'Fall' : 'Spring'
-  var tens = Math.floor((code % 100) / 10)
-  var year = 2019 + tens + (semester === 'Spring' ? 1 : 0)
-  return semester + ' ' + year
-}
-
 // --- Course Card Rendering ---
 // Fetches the real PrincetonCourses course object from MongoDB via the search API,
 // then renders it using the same newDOMcourseResult function as the left-side results.
@@ -171,55 +163,42 @@ function chatTermCodeToName (code) {
 function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (!courseData || !courseData.code) return false
 
-  // Extract a clean search code — e.g. "COS 217 / EGR 217" → "COS217"
   var code = courseData.code || ''
   var searchCode = code.split(/\s*\/\s*/)[0].replace(/\s+/g, '')
-
-  // Show a loading state on the tool card while we fetch
   if (toolDomId) markToolDone(toolDomId)
 
-  // Fetch the real course object from PrincetonCourses MongoDB
-  // Search API at /api/search/:query returns a flat array
-  $.getJSON('/api/search/' + encodeURIComponent(searchCode), function (results) {
-    if (!results || !Array.isArray(results) || results.length === 0) return
+  function placeCard (results) {
+    if (!results || !Array.isArray(results)) return
+    var courses = results.filter(function (r) { return r.type === 'course' })
+    if (courses.length === 0) return
 
-    // Find the most recent course result by term code (semester field is a number like 1272)
-    var courseResults = []
-    for (var ri = 0; ri < results.length; ri++) {
-      if (results[ri].type === 'course') courseResults.push(results[ri])
-    }
-    if (courseResults.length === 0) return
-    courseResults.sort(function (a, b) { return (b.semester || 0) - (a.semester || 0) })
-    var course = courseResults[0]
+    // Pick the most recent offering (highest semester code = most recent)
+    courses.sort(function (a, b) { return (b.semester || 0) - (a.semester || 0) })
+    var course = courses[0]
 
-    // semester is a raw term code number — wrap it into an object for newDOMcourseResult
-    if (typeof course.semester === 'number') {
-      course.semester = { _id: course.semester, name: chatTermCodeToName(course.semester) }
-    }
-    // Use the existing renderer — produces identical card to the left side
-    var entry = newDOMcourseResult(course, { tags: 1, semester: 1 })
-
-    // Remove the Ask AI diamond icon from chat-rendered cards
+    // Render using existing card function — don't show semester text (avoids bad name mapping)
+    var entry = newDOMcourseResult(course, { tags: 1 })
     $(entry).find('.ask-ai-icon').remove()
 
-    // Replace the tool card with the course card
+    var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
+    $(entry).addClass('chat-inline-course')
+    wrapper.append(entry)
     if (toolDomId) {
-      var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
-      $(entry).addClass('chat-inline-course')
-      wrapper.append(entry)
       $('#' + toolDomId).replaceWith(wrapper)
     } else {
-      var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
-      $(entry).addClass('chat-inline-course')
-      wrapper.append(entry)
       $('#' + containerId + '-body').append(wrapper)
     }
     scrollChatToBottom()
+  }
+
+  // Try searching with no semester filter so we get all offerings and pick the newest
+  $.getJSON('/api/search/' + encodeURIComponent(searchCode), function (results) {
+    placeCard(results)
   }).fail(function (xhr) {
     console.error('Chat course card search failed:', xhr.status, xhr.responseText)
   })
 
-  return true  // return true immediately to suppress the raw JSON preview
+  return true
 }
 
 function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
