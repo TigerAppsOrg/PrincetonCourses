@@ -156,58 +156,80 @@ function loadConversation (convId) {
 }
 
 // --- Course Card Rendering ---
+// Builds a course card matching the left-side search result style.
+// Clicking it calls displayCourseDetails to open the course in the middle pane.
 
-function renderCourseCardFromToolResult (containerId, resultData) {
-  if (!resultData || !resultData.code) return null
-  var code = resultData.code || ''
-  var title = resultData.title || ''
-  var dists = resultData.dists || []
-  var hasFinal = resultData.hasFinal
-  var status = resultData.status || ''
-  var term = resultData.term
-  var termName = resultData.termName || ''
-  var rating = null
-  if (resultData.latestRating) rating = resultData.latestRating
-  if (resultData.rating) rating = resultData.rating
+function renderCourseCardInChat (containerId, courseData) {
+  if (!courseData || !courseData.code) return false
 
-  // Build dist badges
-  var distHtml = ''
-  var distColors = { 'EC': '#d9534f', 'EM': '#d9534f', 'HA': '#337ab7', 'LA': '#337ab7', 'SA': '#337ab7', 'QCR': '#5cb85c', 'QR': '#5cb85c', 'SEL': '#f0ad4e', 'SEN': '#f0ad4e', 'CD': '#5bc0de' }
-  for (var i = 0; i < dists.length; i++) {
-    var d = dists[i]
-    var bg = distColors[d] || '#777'
-    distHtml += '<span class="chat-course-dist" style="background:' + bg + '">' + escapeHtml(d) + '</span> '
+  var code = courseData.code || ''
+  var title = courseData.title || ''
+  var dists = courseData.dists || []
+  var status = courseData.status || ''
+  var rating = courseData.latestRating || courseData.rating || null
+
+  // Build a fake course object compatible with icon.js helpers
+  var parts = code.split(/\s*\/\s*/)[0].match(/^([A-Za-z]+)\s*(\d+.*)$/)
+  var dept = parts ? parts[1].toUpperCase() : ''
+  var catNum = parts ? parts[2] : ''
+  var fakeCourse = {
+    department: dept,
+    catalogNumber: catNum,
+    distribution: (dists || []).join(','),
+    crosslistings: [],
+    pdf: {},
+    title: title
   }
 
-  // Status badge
-  var statusClass = status === 'open' ? 'chat-status-open' : (status === 'closed' ? 'chat-status-closed' : '')
-  var statusIcon = status === 'closed' ? '<span class="chat-course-status chat-status-closed" title="Closed">&#128274;</span>' : ''
-
-  // Rating badge
-  var ratingHtml = ''
-  if (rating && rating > 0) {
-    var ratingColor = rating >= 4.0 ? '#5cb85c' : (rating >= 3.0 ? '#f0ad4e' : '#d9534f')
-    ratingHtml = '<span class="chat-course-rating" style="background:' + ratingColor + '">' + rating.toFixed(2) + '</span>'
+  // Use existing helper if available, else build manually
+  var listingHtml = (typeof newHTMLlistings === 'function')
+    ? newHTMLlistings(fakeCourse)
+    : '<strong>' + escapeHtml(code) + '</strong>'
+  var tagsHtml = (typeof newHTMLtags === 'function')
+    ? '<small>' + newHTMLtags(fakeCourse) + '</small>'
+    : ''
+  var scoreHtml = ''
+  if (rating && typeof newHTMLscoreBadge === 'function') {
+    fakeCourse.scores = { 'Quality of Course': rating }
+    scoreHtml = newHTMLscoreBadge(fakeCourse)
   }
 
-  // Clickable link - search for this course
-  var searchCode = code.replace(/\s*\/.*$/, '').replace(/\s+/g, '')
-  var href = '/course?search=' + encodeURIComponent(searchCode) + '&semester=' + (term || '') + '&sort=commonname'
+  // Lock icon for open/closed
+  var lockHtml = ''
+  if (status === 'closed' || status === 'open') {
+    fakeCourse.open = (status === 'open')
+    if (typeof newHTMLlock === 'function') lockHtml = newHTMLlock(fakeCourse)
+  }
 
-  var html = '<a href="' + href + '" class="chat-course-card chat-animate-in" target="_top">' +
-    '<div class="chat-course-card-top">' +
-    statusIcon +
-    '<span class="chat-course-code">' + escapeHtml(code) + '</span> ' +
-    distHtml +
-    ratingHtml +
-    '</div>' +
-    '<div class="chat-course-card-bottom">' +
-    escapeHtml(title) +
-    (termName ? '<span class="chat-course-term">' + escapeHtml(termName) + '</span>' : '') +
-    '</div>' +
-    '</a>'
+  var cardHtml =
+    '<div class="chat-course-card-wrapper chat-animate-in">' +
+    '<li class="list-group-item search-result chat-inline-course">' +
+      '<div class="flex-container-row">' +
+        '<div class="flex-item-stretch truncate">' +
+          lockHtml + ' <strong>' + listingHtml + '</strong> ' + tagsHtml +
+        '</div>' +
+        '<div class="flex-item-rigid">' +
+          '&nbsp;' + scoreHtml +
+        '</div>' +
+      '</div>' +
+      '<div class="flex-container-row">' +
+        '<div class="flex-item-stretch truncate">' + escapeHtml(title) + '</div>' +
+      '</div>' +
+    '</li>' +
+    '</div>'
 
-  $('#' + containerId + '-body').append(html)
+  var el = $(cardHtml)
+  // On click, search for course by code to get the PrincetonCourses _id, then display it
+  var searchCode = dept + catNum
+  el.find('.search-result').css('cursor', 'pointer').on('click', function () {
+    $.get('/api/search?query=' + encodeURIComponent(searchCode), function (results) {
+      if (results && results.length > 0) {
+        displayCourseDetails(results[0]._id, false)
+      }
+    })
+  })
+
+  $('#' + containerId + '-body').append(el)
   scrollChatToBottom()
   return true
 }
@@ -220,7 +242,7 @@ function tryRenderCourseCard (containerId, toolName, data) {
       try {
         var parsed = JSON.parse(data.result.content[i].text)
         if (parsed.code) {
-          return renderCourseCardFromToolResult(containerId, parsed)
+          return renderCourseCardInChat(containerId, parsed)
         }
       } catch (_) {}
     }
@@ -706,9 +728,13 @@ function sendChatMessage (text) {
             }
           }
           if (matchedPart && matchedPart.domId) {
-            markToolDone(matchedPart.domId)
-            // Try to render a course card for get_course_details results
+            // Try to render a course card for get_course_details — replaces the tool card
             var renderedCard = tryRenderCourseCard(containerId, resultName, data)
+            if (renderedCard) {
+              $('#' + matchedPart.domId).remove()
+            } else {
+              markToolDone(matchedPart.domId)
+            }
             if (!renderedCard && data && data.result && data.result.content) {
               var resultPreview = ''
               for (var ci = 0; ci < data.result.content.length; ci++) {
