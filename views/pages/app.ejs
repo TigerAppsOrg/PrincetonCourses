@@ -45,9 +45,7 @@
           <li id="feedback-toggle"><a href="#">Feedback</a></li>
           <li id="netid"><a href="#"><%= netid %></a></li>
           <li id="logout" class="active" style="display:none;"><a href="/auth/logout">Logout</a></li>
-          <li id="chat-toggle"><a href="#"><span id="ask-ai-btn"><span id="ai-bot-dot"></span>
-            Ask AI
-          </span></a></li>
+          <li id="chat-toggle"><a href="#"><span id="ask-ai-btn"><span class="ask-ai-sparkle">&#10024;</span> ASK AI</span></a></li>
         </ul>
       </div>
     </nav>
@@ -249,7 +247,6 @@
       <div id="chat-resizer" class="flex-item-rigid resizer-inactive"></div>
       <div id="chat-pane" class="flex-container-col slide" style="display: none;">
         <div id="chat-header" class="flex-item-rigid">
-          <span id="ai-bot-dot"></span>
           <div id="chat-quota-display">
             <div id="chat-usage-bar">
               <div id="chat-usage-fill" style="width: 0%"></div>
