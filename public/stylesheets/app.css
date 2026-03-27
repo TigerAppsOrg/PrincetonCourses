@@ -797,6 +797,9 @@ body {
   color: #666;
   white-space: nowrap;
 }
+#chat-pane {
+  position: relative;
+}
 #chat-history-panel {
   position: absolute;
   top: 36px;
