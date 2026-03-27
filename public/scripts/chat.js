@@ -80,6 +80,7 @@ function fetchConversations () {
 function renderConversationList (conversations) {
   var container = document.getElementById('chat-history-list')
   if (!container) return
+  // testing for now just with empty
   if (!conversations || conversations.length === 0) {
     container.innerHTML = '<div class="chat-history-empty">No previous chats</div>'
     return
@@ -281,6 +282,8 @@ function autoResize (el) {
 
 function newConversation () {
   if (chatState.streaming) cancelStream()
+  var panel = document.getElementById('chat-history-panel')
+  if (panel) panel.style.display = 'none'
   chatState.messages = []
   chatState.conversationId = null
   chatState.userToggledThinking = false
