@@ -171,8 +171,8 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (toolDomId) markToolDone(toolDomId)
 
   // Fetch the real course object from PrincetonCourses MongoDB
-  // Search API returns a flat array of combined course+instructor results
-  $.post('/api/search/' + encodeURIComponent(searchCode), function (results) {
+  // Search API at /api/search/:query returns a flat array
+  $.getJSON('/api/search/' + encodeURIComponent(searchCode), function (results) {
     if (!results || !Array.isArray(results) || results.length === 0) return
 
     // Find the most recent course result (highest semester._id = most recent term)
@@ -204,6 +204,8 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
       $('#' + containerId + '-body').append(wrapper)
     }
     scrollChatToBottom()
+  }).fail(function (xhr) {
+    console.error('Chat course card search failed:', xhr.status, xhr.responseText)
   })
 
   return true  // return true immediately to suppress the raw JSON preview
