@@ -171,10 +171,16 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (toolDomId) markToolDone(toolDomId)
 
   // Fetch the real course object from PrincetonCourses MongoDB
+  // Search API returns a flat array of combined course+instructor results
   $.post('/api/search/' + encodeURIComponent(searchCode), function (results) {
-    if (!results || !results.courses || results.courses.length === 0) return
+    if (!results || !Array.isArray(results) || results.length === 0) return
 
-    var course = results.courses[0]
+    // Find the first course result (skip instructor results)
+    var course = null
+    for (var ri = 0; ri < results.length; ri++) {
+      if (results[ri].type === 'course') { course = results[ri]; break }
+    }
+    if (!course) return
     // Use the existing renderer — produces identical card to the left side
     var entry = newDOMcourseResult(course, { tags: 1, semester: 1 })
 
