@@ -853,16 +853,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: rgba(0, 0, 0, 0.12);
   color: #000;
-  padding: 4px 12px;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: background-color 0.2s;
+  font-size: 14px;
+  font-weight: 400;
+  transition: color 0.4s ease;
 }
 #ask-ai-btn:hover {
-  background-color: rgba(0, 0, 0, 0.22);
+  color: #fff;
 }
 #ai-bot-dot {
   width: 7px;
@@ -1050,17 +1047,17 @@ body {
   stroke: #fff !important;
 }
 .chat-welcome-title {
-  font-family: "Raleway", sans-serif;
-  font-weight: 500;
-  font-size: 1rem;
+  font-family: "Open Sans", -apple-system, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
   color: #333;
   margin-top: 4px;
 }
 .chat-welcome-subtitle {
-  font-size: 0.8rem;
+  font-size: 14px;
   color: #888;
   line-height: 1.5;
-  max-width: 220px;
+  max-width: 280px;
 }
 
 /* ── Entrance animation ── */
