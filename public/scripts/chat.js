@@ -133,7 +133,14 @@ function loadConversation (convId) {
           markToolDone(toolDomId)
         } catch (_) {}
       } else if (m.role === 'tool_result') {
-        // tool results are already shown as checkmarks via markToolDone above
+        if (!currentContainer) currentContainer = createAssistantContainer()
+        // Try to render a course card for get_course_details results
+        try {
+          var tr = JSON.parse(m.content)
+          if (tr.name === 'get_course_details' && tr.result && tr.result.content) {
+            tryRenderCourseCard(currentContainer, 'get_course_details', tr)
+          }
+        } catch (_) {}
       } else if (m.role === 'assistant') {
         chatState.messages.push({ role: 'assistant', content: m.content })
         if (!currentContainer) currentContainer = createAssistantContainer()
@@ -146,6 +153,79 @@ function loadConversation (convId) {
   }).catch(function (err) {
     showErrorInChat('Failed to load conversation')
   })
+}
+
+// --- Course Card Rendering ---
+
+function renderCourseCardFromToolResult (containerId, resultData) {
+  if (!resultData || !resultData.code) return null
+  var code = resultData.code || ''
+  var title = resultData.title || ''
+  var dists = resultData.dists || []
+  var hasFinal = resultData.hasFinal
+  var status = resultData.status || ''
+  var term = resultData.term
+  var termName = resultData.termName || ''
+  var rating = null
+  if (resultData.latestRating) rating = resultData.latestRating
+  if (resultData.rating) rating = resultData.rating
+
+  // Build dist badges
+  var distHtml = ''
+  var distColors = { 'EC': '#d9534f', 'EM': '#d9534f', 'HA': '#337ab7', 'LA': '#337ab7', 'SA': '#337ab7', 'QCR': '#5cb85c', 'QR': '#5cb85c', 'SEL': '#f0ad4e', 'SEN': '#f0ad4e', 'CD': '#5bc0de' }
+  for (var i = 0; i < dists.length; i++) {
+    var d = dists[i]
+    var bg = distColors[d] || '#777'
+    distHtml += '<span class="chat-course-dist" style="background:' + bg + '">' + escapeHtml(d) + '</span> '
+  }
+
+  // Status badge
+  var statusClass = status === 'open' ? 'chat-status-open' : (status === 'closed' ? 'chat-status-closed' : '')
+  var statusIcon = status === 'closed' ? '<span class="chat-course-status chat-status-closed" title="Closed">&#128274;</span>' : ''
+
+  // Rating badge
+  var ratingHtml = ''
+  if (rating && rating > 0) {
+    var ratingColor = rating >= 4.0 ? '#5cb85c' : (rating >= 3.0 ? '#f0ad4e' : '#d9534f')
+    ratingHtml = '<span class="chat-course-rating" style="background:' + ratingColor + '">' + rating.toFixed(2) + '</span>'
+  }
+
+  // Clickable link - search for this course
+  var searchCode = code.replace(/\s*\/.*$/, '').replace(/\s+/g, '')
+  var href = '/course?search=' + encodeURIComponent(searchCode) + '&semester=' + (term || '') + '&sort=commonname'
+
+  var html = '<a href="' + href + '" class="chat-course-card chat-animate-in" target="_top">' +
+    '<div class="chat-course-card-top">' +
+    statusIcon +
+    '<span class="chat-course-code">' + escapeHtml(code) + '</span> ' +
+    distHtml +
+    ratingHtml +
+    '</div>' +
+    '<div class="chat-course-card-bottom">' +
+    escapeHtml(title) +
+    (termName ? '<span class="chat-course-term">' + escapeHtml(termName) + '</span>' : '') +
+    '</div>' +
+    '</a>'
+
+  $('#' + containerId + '-body').append(html)
+  scrollChatToBottom()
+  return true
+}
+
+function tryRenderCourseCard (containerId, toolName, data) {
+  if (toolName !== 'get_course_details') return false
+  if (!data || !data.result || !data.result.content) return false
+  for (var i = 0; i < data.result.content.length; i++) {
+    if (data.result.content[i].text) {
+      try {
+        var parsed = JSON.parse(data.result.content[i].text)
+        if (parsed.code) {
+          return renderCourseCardFromToolResult(containerId, parsed)
+        }
+      } catch (_) {}
+    }
+  }
+  return false
 }
 
 // --- Toggle & Layout ---
@@ -627,7 +707,9 @@ function sendChatMessage (text) {
           }
           if (matchedPart && matchedPart.domId) {
             markToolDone(matchedPart.domId)
-            if (data && data.result && data.result.content) {
+            // Try to render a course card for get_course_details results
+            var renderedCard = tryRenderCourseCard(containerId, resultName, data)
+            if (!renderedCard && data && data.result && data.result.content) {
               var resultPreview = ''
               for (var ci = 0; ci < data.result.content.length; ci++) {
                 if (data.result.content[ci].text) {

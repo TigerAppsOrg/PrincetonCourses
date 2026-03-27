@@ -844,6 +844,74 @@ body {
   color: #999;
   font-size: 0.82rem;
 }
+.chat-course-card {
+  display: block;
+  padding: 8px 10px;
+  margin: 6px 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-left: 3px solid #EE7F2D;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #333;
+  transition: background 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.chat-course-card:hover {
+  background: #fdf6f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  text-decoration: none;
+  color: #333;
+}
+.chat-course-card-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.chat-course-code {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #333;
+}
+.chat-course-dist {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+.chat-course-rating {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  width: 34px;
+  height: 18px;
+  border-radius: 9px;
+  margin-left: auto;
+}
+.chat-course-status {
+  font-size: 0.75rem;
+  margin-right: 2px;
+}
+.chat-course-card-bottom {
+  font-size: 0.78rem;
+  color: #555;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-course-term {
+  color: #999;
+  margin-left: 8px;
+  font-size: 0.72rem;
+}
 .chat-quota-msg {
   font-size: 0.78rem;
   color: #888;
