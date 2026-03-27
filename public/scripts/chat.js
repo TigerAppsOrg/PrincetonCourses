@@ -162,35 +162,59 @@ function loadConversation (convId) {
 
 function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (!courseData || !courseData.code) return false
-
-  var code = courseData.code || ''
-  var searchCode = code.split(/\s*\/\s*/)[0].replace(/\s+/g, '')
   if (toolDomId) markToolDone(toolDomId)
 
-  function placeCard (results) {
-    if (!results || !Array.isArray(results)) return
-    var courses = results.filter(function (r) { return r.type === 'course' })
-    if (courses.length === 0) return
+  // Compute PrincetonCourses _id: semester * 1000000 + parseInt(listingId)
+  // Engine returns listingId (e.g., "007996") and term (e.g., 1272)
+  var pcId = null
+  if (courseData.listingId && courseData.term) {
+    pcId = courseData.term * 1000000 + parseInt(courseData.listingId, 10)
+  }
 
-    // Pick the most recent offering
-    // _id encodes semester in first 4 digits (e.g., 1272007996 = Fall 2026 + course 007996)
-    courses.sort(function (a, b) { return Number(b._id) - Number(a._id) })
-    var course = courses[0]
-    console.log('[chat] Course card: picked _id=' + course._id + ' semester=' + course.semester + ' from ' + courses.length + ' results. Top 3:', courses.slice(0, 3).map(function (c) { return c._id + '(sem=' + c.semester + ')' }))
+  // Fetch the full course object from PrincetonCourses by its _id
+  if (pcId) {
+    $.getJSON('/api/course/' + pcId, function (course) {
+      if (!course || !course._id) return
+      renderCard(course, pcId)
+    }).fail(function () {
+      // Fallback: render a simple card without full PrincetonCourses data
+      renderSimpleCard()
+    })
+  } else {
+    renderSimpleCard()
+  }
 
-    // Render using existing card function — don't show semester text
+  function renderCard (course, courseId) {
+    // Build a full course object for newDOMcourseResult
     var entry = newDOMcourseResult(course, { tags: 1 })
     $(entry).find('.ask-ai-icon').remove()
-
-    // Override click handler — newDOMcourseResult may bind to wrong _id
-    var correctId = course._id
-    $(entry).off('click').on('click', function () {
-      displayCourseDetails(correctId, false)
+    // Override click to ensure correct _id
+    $(entry).off('click').on('click', function (e) {
+      e.stopPropagation()
+      displayCourseDetails(courseId, false)
       return false
     })
 
+    placeEntry(entry)
+  }
+
+  function renderSimpleCard () {
+    var code = courseData.code || ''
+    var title = courseData.title || ''
+    var html = '<li class="list-group-item search-result chat-inline-course" style="cursor:pointer">' +
+      '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
+      '<strong>' + escapeHtml(code) + '</strong></div></div>' +
+      '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
+      escapeHtml(title) + '</div></div></li>'
+    var entry = $.parseHTML(html)[0]
+    if (pcId) {
+      $(entry).on('click', function () { displayCourseDetails(pcId, false); return false })
+    }
+    placeEntry(entry)
+  }
+
+  function placeEntry (entry) {
     var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
-    $(entry).addClass('chat-inline-course')
     wrapper.append(entry)
     if (toolDomId) {
       $('#' + toolDomId).replaceWith(wrapper)
@@ -199,13 +223,6 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
     }
     scrollChatToBottom()
   }
-
-  // Try searching with no semester filter so we get all offerings and pick the newest
-  $.getJSON('/api/search/' + encodeURIComponent(searchCode), function (results) {
-    placeCard(results)
-  }).fail(function (xhr) {
-    console.error('Chat course card search failed:', xhr.status, xhr.responseText)
-  })
 
   return true
 }
