@@ -282,6 +282,8 @@ function autoResize (el) {
 
 function newConversation () {
   if (chatState.streaming) cancelStream()
+  var panel = document.getElementById('chat-history-panel')
+  if (panel) panel.style.display = 'none'
   chatState.messages = []
   chatState.conversationId = null
   chatState.userToggledThinking = false
