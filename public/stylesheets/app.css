@@ -405,17 +405,111 @@ body {
   overflow-x: hidden;
   max-width: 100vw;
 }
-.page-header > p {
-  opacity: 0;
-  margin:5px;
-  font-size:1em;
-  font-weight: bold;
-  transition: all 0.5s;
-}
-.page-header >img:hover + p {
-  opacity: 0.5;
+
+.welcome-container {
+  position: relative;
+  padding: 30px 40px 10px;
+  overflow: hidden;
 }
 
+/* Decorative orange arc (top-right) */
+.welcome-arc {
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 3px solid #EE7F2D;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* AI callout card */
+.welcome-ai-card {
+  max-width: 420px;
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.welcome-ai-card:hover {
+  border-color: #EE7F2D;
+  box-shadow: 0 2px 12px rgba(238, 127, 45, 0.15);
+}
+.welcome-ai-title {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 8px;
+}
+.welcome-ai-icon {
+  font-size: 1.1em;
+  margin-right: 4px;
+}
+.welcome-ai-desc {
+  font-size: 0.95em;
+  color: #666;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* Hero section: WELCOME! text + Calvin image */
+.welcome-hero {
+  text-align: center;
+  margin: 10px 0 20px;
+  position: relative;
+}
+.welcome-title {
+  font-family: "Raleway", sans-serif;
+  font-weight: 600;
+  font-size: 3.2em;
+  letter-spacing: 0.06em;
+  color: #EE7F2D;
+  margin: 0 0 -10px;
+  display: inline-block;
+}
+.welcome-title span {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.welcome-title span:nth-child(odd) {
+  transform: rotate(-4deg) translateY(2px);
+}
+.welcome-title span:nth-child(even) {
+  transform: rotate(3deg) translateY(-3px);
+}
+.welcome-title span:nth-child(3) {
+  transform: rotate(-6deg) translateY(-5px);
+}
+.welcome-title span:nth-child(5) {
+  transform: rotate(5deg) translateY(-6px);
+}
+.welcome-img-wrap {
+  position: relative;
+  display: inline-block;
+}
+.welcome-img {
+  max-width: 380px;
+  position: relative;
+  z-index: 1;
+}
+.welcome-img-shadow {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  height: 80px;
+  background: radial-gradient(ellipse, rgba(238, 200, 170, 0.35) 0%, transparent 70%);
+  border-radius: 50%;
+  z-index: 0;
+}
+
+/* Feature cards */
 @media (min-width: 992px) {
   .row-md-flex {
     display: flex;
@@ -426,6 +520,15 @@ body {
   .col-xs-welcome {
     max-width: 300px;
     margin: 0 auto;
+  }
+  .welcome-container {
+    padding: 20px 16px 10px;
+  }
+  .welcome-title {
+    font-size: 2.2em;
+  }
+  .welcome-img {
+    max-width: 260px;
   }
 }
 
