@@ -172,11 +172,13 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
     var courses = results.filter(function (r) { return r.type === 'course' })
     if (courses.length === 0) return
 
-    // Pick the most recent offering (highest semester code = most recent)
-    courses.sort(function (a, b) { return (b.semester || 0) - (a.semester || 0) })
+    // Pick the most recent offering
+    // _id encodes semester in first 4 digits (e.g., 1272007996 = Fall 2026 + course 007996)
+    // Sort by _id descending as numbers — highest _id = most recent semester
+    courses.sort(function (a, b) { return Number(b._id) - Number(a._id) })
     var course = courses[0]
 
-    // Render using existing card function — don't show semester text (avoids bad name mapping)
+    // Render using existing card function — don't show semester text
     var entry = newDOMcourseResult(course, { tags: 1 })
     $(entry).find('.ask-ai-icon').remove()
 
