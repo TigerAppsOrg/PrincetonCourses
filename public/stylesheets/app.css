@@ -764,28 +764,48 @@ body {
   flex-shrink: 0;
   border-bottom: 1px solid #ddd;
 }
-#chat-model-select {
+#chat-quota-display {
   flex-grow: 1;
-  font-family: "Open Sans", -apple-system, sans-serif;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: #333;
-  background: #e4e4e4;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  padding: 2px 4px;
-  cursor: pointer;
-  outline: none;
-  max-width: 160px;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 5px center;
-  padding-right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
 }
-#chat-model-select:focus {
-  border-color: #EE7F2D;
+#chat-usage-bar {
+  flex-grow: 1;
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+  overflow: hidden;
+}
+#chat-usage-fill {
+  height: 100%;
+  background: #2ecc40;
+  border-radius: 3px;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+#chat-usage-fill.usage-mid {
+  background: #f0ad4e;
+}
+#chat-usage-fill.usage-high {
+  background: #d9534f;
+}
+#chat-usage-label {
+  font-family: "Open Sans", -apple-system, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+.chat-quota-msg {
+  font-size: 0.78rem;
+  color: #888;
+  text-align: center;
+  padding: 6px 12px;
+  background: #f9f3ed;
+  border: 1px solid #f0e0cc;
+  border-radius: 6px;
+  margin: 6px 10px;
 }
 #chat-header #ai-bot-dot {
   width: 6px;

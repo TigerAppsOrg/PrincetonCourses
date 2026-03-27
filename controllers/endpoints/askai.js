@@ -82,4 +82,25 @@ router.post('/stream', async function (req, res) {
   }
 })
 
+router.get('/quota', async function (req, res) {
+  let user = res.locals.user
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' })
+  }
+
+  let quotaURL = config.askGatewayURL + '/ask/quota?netid=' + encodeURIComponent(user._id)
+  let headers = {}
+  if (config.askGatewayToken) {
+    headers['Authorization'] = 'Bearer ' + config.askGatewayToken
+  }
+
+  try {
+    let upstream = await fetch(quotaURL, { headers })
+    let data = await upstream.json()
+    res.json(data)
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to get quota', detail: err.message })
+  }
+})
+
 module.exports = router

@@ -8,6 +8,50 @@ var chatState = {
   userToggledThinking: false
 }
 
+// --- Quota & Usage Bar ---
+
+function updateUsageBar (percent, tier) {
+  var fill = document.getElementById('chat-usage-fill')
+  var label = document.getElementById('chat-usage-label')
+  if (!fill || !label) return
+  fill.style.width = Math.min(100, Math.max(0, percent)) + '%'
+  fill.className = ''
+  if (percent >= 90 || tier === 'exhausted') {
+    fill.className = 'usage-high'
+  } else if (percent >= 60) {
+    fill.className = 'usage-mid'
+  }
+  if (tier === 1) label.textContent = 'Sonnet 4.6'
+  else if (tier === 2) label.textContent = 'Haiku 4.5'
+  else if (tier === 'exhausted') label.textContent = 'Limit reached'
+}
+
+function showQuotaMessage (msg) {
+  var html = '<div class="chat-quota-msg chat-animate-in">' + escapeHtml(msg) + '</div>'
+  $('#chat-messages').append(html)
+  scrollChatToBottom()
+}
+
+function formatResetTime (seconds) {
+  if (!seconds || seconds <= 0) return 'soon'
+  var h = Math.floor(seconds / 3600)
+  var m = Math.floor((seconds % 3600) / 60)
+  if (h > 0 && m > 0) return h + 'h ' + m + 'm'
+  if (h > 0) return h + 'h'
+  return m + 'm'
+}
+
+function fetchQuotaStatus () {
+  fetch('/api/ask-ai/quota').then(function (res) {
+    if (!res.ok) return
+    return res.json()
+  }).then(function (data) {
+    if (data) {
+      updateUsageBar(data.percentUsed, data.tier)
+    }
+  }).catch(function () {})
+}
+
 // --- Toggle & Layout ---
 
 function toggleChat () {
@@ -377,8 +421,6 @@ function sendChatMessage (text) {
   if (chatState.conversationId) payload.conversationId = chatState.conversationId
   var term = getCurrentTerm()
   if (term) payload.term = term
-  var modelEl = document.getElementById('chat-model-select')
-  if (modelEl && modelEl.value) payload.model = modelEl.value
 
   // Helper: get or create the current part of a given type
   function ensurePart (type) {
@@ -534,11 +576,26 @@ function sendChatMessage (text) {
           showErrorInChat(errMsg)
           break
 
+        case 'quota_exhausted':
+          setStreamingUI(false)
+          updateUsageBar(100, 'exhausted')
+          showQuotaMessage('Usage limit reached. Resets in ' + formatResetTime(data && data.resetSeconds) + '.')
+          break
+
         case 'done':
           // Finalize any open thinking block
           finalizePreviousThinking()
           chatState.messages.push({ role: 'assistant', content: fullText })
           if (data && data.conversationId) chatState.conversationId = data.conversationId
+          // Update quota bar
+          if (data && data.quota) {
+            updateUsageBar(data.quota.percentUsed, data.quota.tier)
+            if (data.quota.tierChanged && data.quota.tier === 2) {
+              showQuotaMessage('Switched to a lighter model to conserve usage.')
+            } else if (data.quota.tierChanged && data.quota.tier === 'exhausted') {
+              showQuotaMessage('Usage limit reached. Resets in ' + formatResetTime(data.quota.resetSeconds) + '.')
+            }
+          }
           setStreamingUI(false)
           break
       }
@@ -600,6 +657,7 @@ $(function () {
   appendWelcomeMessage()
   updateSuggestionChips()
   initChatScroll()
+  fetchQuotaStatus()
 
   $('#chat-send-btn').on('click', function () {
     var ta = document.getElementById('chat-ta')
