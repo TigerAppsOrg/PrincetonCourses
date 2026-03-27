@@ -118,15 +118,28 @@ function loadConversation (convId) {
     $('#chat-messages').empty()
     $('#chat-prompts-area').slideUp(0)
 
+    var currentContainer = null
     for (var i = 0; i < messages.length; i++) {
       var m = messages[i]
-      chatState.messages.push({ role: m.role, content: m.content })
       if (m.role === 'user') {
+        chatState.messages.push({ role: 'user', content: m.content })
         appendUserMessage(m.content)
+        currentContainer = null
+      } else if (m.role === 'tool_call') {
+        if (!currentContainer) currentContainer = createAssistantContainer()
+        try {
+          var tc = JSON.parse(m.content)
+          var toolDomId = appendToolCard(currentContainer, tc.name || 'tool', tc.arguments || null)
+          markToolDone(toolDomId)
+        } catch (_) {}
+      } else if (m.role === 'tool_result') {
+        // tool results are already shown as checkmarks via markToolDone above
       } else if (m.role === 'assistant') {
-        var cid = createAssistantContainer()
-        var tid = appendTextBlock(cid)
+        chatState.messages.push({ role: 'assistant', content: m.content })
+        if (!currentContainer) currentContainer = createAssistantContainer()
+        var tid = appendTextBlock(currentContainer)
         document.getElementById(tid).innerHTML = renderMarkdown(m.content)
+        currentContainer = null
       }
     }
     scrollChatToBottom()
