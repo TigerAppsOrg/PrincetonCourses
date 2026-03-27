@@ -906,7 +906,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  height: 48px;
   padding: 0 8px;
   background: #eee;
   color: #333;
@@ -924,7 +924,7 @@ body {
 }
 #chat-usage-bar {
   flex-grow: 1;
-  height: 6px;
+  height: 10px;
   background: #ddd;
   border-radius: 3px;
   overflow: hidden;
@@ -943,26 +943,27 @@ body {
 }
 #chat-usage-pct {
   font-family: "Open Sans", -apple-system, sans-serif;
-  font-size: 0.65rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #555;
   white-space: nowrap;
   min-width: 22px;
-  text-align: right;
+  text-align: left;
 }
 #chat-usage-label {
   font-family: "Open Sans", -apple-system, sans-serif;
-  font-size: 0.7rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #666;
   white-space: nowrap;
+  text-align: right;
 }
 #chat-pane {
   position: relative;
 }
 #chat-history-panel {
   position: absolute;
-  top: 36px;
+  top: 48px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -986,7 +987,7 @@ body {
   background: #f5f5f5;
 }
 .chat-history-title {
-  font-size: 0.82rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: #333;
   white-space: nowrap;
@@ -994,7 +995,7 @@ body {
   text-overflow: ellipsis;
 }
 .chat-history-time {
-  font-size: 0.7rem;
+  font-size: 1.2rem;
   color: #999;
   margin-top: 2px;
 }
@@ -1002,7 +1003,7 @@ body {
   padding: 20px 12px;
   text-align: center;
   color: #999;
-  font-size: 0.82rem;
+  font-size: 1.5rem;
 }
 .chat-course-card-wrapper {
   margin: 4px 0;
@@ -1036,8 +1037,8 @@ body {
   border: none;
   color: #999;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1045,6 +1046,24 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 #chat-header-actions button:hover {
+  color: #333;
+  background: rgba(0,0,0,0.06);
+}
+#chat-close-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+#chat-close-btn:hover {
   color: #333;
   background: rgba(0,0,0,0.06);
 }
