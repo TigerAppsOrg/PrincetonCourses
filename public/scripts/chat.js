@@ -232,19 +232,120 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
 }
 
 function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
-  if (toolName !== 'get_course_details') return false
   if (!data || !data.result || !data.result.content) return false
-  for (var i = 0; i < data.result.content.length; i++) {
-    if (data.result.content[i].text) {
-      try {
-        var parsed = JSON.parse(data.result.content[i].text)
-        if (parsed.code) {
-          return renderCourseCardInChat(containerId, parsed, toolDomId)
-        }
-      } catch (_) {}
+
+  if (toolName === 'get_course_details') {
+    for (var i = 0; i < data.result.content.length; i++) {
+      if (data.result.content[i].text) {
+        try {
+          var parsed = JSON.parse(data.result.content[i].text)
+          if (parsed.code) {
+            return renderCourseCardInChat(containerId, parsed, toolDomId)
+          }
+        } catch (_) {}
+      }
     }
   }
+
+  if (toolName === 'search_courses' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
+    for (var j = 0; j < data.result.content.length; j++) {
+      if (data.result.content[j].text) {
+        try {
+          var searchParsed = JSON.parse(data.result.content[j].text)
+          if (searchParsed.courses && searchParsed.courses.length > 0) {
+            return renderSearchResultsInChat(containerId, searchParsed.courses, toolDomId)
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
   return false
+}
+
+function renderSearchResultsInChat (containerId, courses, toolDomId) {
+  if (!courses || courses.length === 0) return false
+
+  // Immediately replace tool card with wrapper
+  var wrapper = $('<div class="chat-search-results chat-animate-in"></div>')
+  if (toolDomId) {
+    $('#' + toolDomId).replaceWith(wrapper)
+  } else {
+    $('#' + containerId + '-body').append(wrapper)
+  }
+
+  // Cap at 10
+  var toRender = courses.slice(0, 10)
+  var rendered = 0
+
+  for (var i = 0; i < toRender.length; i++) {
+    ;(function (course, index) {
+      var pcId = null
+      if (course.listingId && course.term) {
+        pcId = course.term * 1000000 + parseInt(course.listingId, 10)
+      }
+
+      if (pcId) {
+        $.getJSON('/api/course/' + pcId, function (fullCourse) {
+          if (fullCourse && fullCourse._id) {
+            addCard(fullCourse, pcId, index)
+          } else {
+            addSimpleCard(course, pcId, index)
+          }
+        }).fail(function () {
+          addSimpleCard(course, pcId, index)
+        })
+      } else {
+        addSimpleCard(course, null, index)
+      }
+    })(toRender[i], i)
+  }
+
+  function addCard (course, courseId, index) {
+    var entry = newDOMcourseResult(course, { tags: 1 })
+    $(entry).find('.ask-ai-icon').remove()
+    $(entry).off('click').on('click', function (e) {
+      e.stopPropagation()
+      displayCourseDetails(courseId, false)
+      return false
+    })
+    insertAtPosition(entry, index)
+  }
+
+  function addSimpleCard (course, pcId, index) {
+    var code = course.code || ''
+    var title = course.title || ''
+    var status = course.status || ''
+    var statusDot = status === 'open' ? '<span style="color:#5cb85c;">&#9679;</span> ' : (status === 'closed' ? '<span style="color:#d9534f;">&#9679;</span> ' : '')
+    var html = '<li class="list-group-item search-result chat-inline-course" style="cursor:pointer">' +
+      '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
+      statusDot + '<strong>' + escapeHtml(code) + '</strong></div></div>' +
+      '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
+      escapeHtml(title) + '</div></div></li>'
+    var entry = $.parseHTML(html)[0]
+    if (pcId) {
+      $(entry).on('click', function () { displayCourseDetails(pcId, false); return false })
+    }
+    insertAtPosition(entry, index)
+  }
+
+  function insertAtPosition (entry, index) {
+    $(entry).attr('data-card-index', index)
+    var children = wrapper.children()
+    var inserted = false
+    for (var k = 0; k < children.length; k++) {
+      if (parseInt($(children[k]).attr('data-card-index'), 10) > index) {
+        $(children[k]).before(entry)
+        inserted = true
+        break
+      }
+    }
+    if (!inserted) wrapper.append(entry)
+    rendered++
+    if (rendered === toRender.length) scrollChatToBottom()
+  }
+
+  return true
 }
 
 // --- Toggle & Layout ---
