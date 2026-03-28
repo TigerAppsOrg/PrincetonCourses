@@ -68,19 +68,71 @@
     display:none;
   }
 
-  /* Mobile chat: full-screen overlay */
-  #chat-pane.chat-mobile-open {
-    position: fixed !important;
-    top: 50px;
-    left: 0;
-    right: 0;
-    bottom: 0;
+  /* Mobile: Ask AI sparkle button in navbar */
+  #chat-toggle-mobile {
+    flex-grow: 0;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border: none !important;
+  }
+  .ask-ai-sparkle-mobile {
+    font-size: 18px;
+    color: #fff;
+  }
+
+  /* Hide desktop Ask AI from collapsed menu */
+  #chat-toggle {
+    display: none !important;
+  }
+
+  /* Hide resizer on mobile */
+  #chat-resizer {
+    display: none !important;
+  }
+
+  /* Mobile chat pane as carousel slide */
+  #chat-pane {
     width: 100vw !important;
-    max-width: 100vw !important;
-    z-index: 900;
-    display: flex !important;
-    flex-direction: column;
     background: #f4f4f4;
+    -webkit-overflow-scrolling: touch;
+  }
+  #chat-pane #chat-messages {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+  }
+  #chat-pane #chat-text-box {
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+  }
+
+  /* Welcome text: move up on mobile */
+  #chat-pane .chat-welcome {
+    padding-top: 20px;
+  }
+
+  /* Chips: allow wrapping on mobile */
+  #chat-pane .chat-prompt-chip {
+    white-space: normal;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  /* Header: compact on mobile */
+  #chat-pane #chat-header {
+    padding: 4px 8px;
+    min-height: 34px;
+    gap: 4px;
+  }
+  #chat-pane #chat-model-select {
+    font-size: 12px;
+    max-width: 130px;
+  }
+}
+
+/* Desktop: hide mobile chat button */
+@media (min-width: 768px) {
+  #chat-toggle-mobile {
+    display: none !important;
   }
 }
 
