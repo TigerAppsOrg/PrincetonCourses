@@ -264,8 +264,12 @@ function toggleChat () {
     return false
   }
   var isVisible = $('#chat-pane').is(':visible')
-  if (isVisible) $('#chat-pane').animate({ width: 'hide' })
-  else $('#chat-pane').animate({ width: 'show' })
+  if (isVisible) {
+    $('#chat-pane').animate({ width: 'hide' })
+  } else {
+    $('#chat-pane').removeClass('chat-pane-hidden')
+    $('#chat-pane').animate({ width: 'show' })
+  }
   $('#chat-resizer').removeClass(isVisible ? 'resizer' : 'resizer-inactive')
   $('#chat-resizer').addClass(isVisible ? 'resizer-inactive' : 'resizer')
   if (isVisible) $('#ask-ai-btn').removeClass('active')

@@ -43,6 +43,9 @@ function layout_refresh() {
 
 // set up mobile layout
 function layout_mobile() {
+  /* show chat pane so slick includes it as a slide */
+  $('#chat-pane').removeClass('chat-pane-hidden').show()
+
   /* set up slick */
   $('#main-pane').slick({infinite: false, edgeFriction: 0.15, slide: '.slide', initialSlide: 2, touchThreshold: 7})
   $('#display-body').slick({infinite: false, edgeFriction: 0.15, slide: '.slide', initialSlide: 0, touchThreshold: 7})
@@ -57,7 +60,8 @@ function layout_mobile() {
 
   $('#main-pane').on('swipe', function(event, slick, direction) {
     if (event.target !== this) return;
-    var overThreshold = (slick.currentLeft < -2*$(window).width()) // check if overflowing right
+    var lastSlideLeft = -(slick.slideCount - 1) * $(window).width()
+    var overThreshold = (slick.currentLeft < lastSlideLeft)
     if (direction === 'left' && overThreshold) $('#display-body').slick('slickNext')
   })
 
@@ -95,6 +99,9 @@ function layout_toMobile() {
 
 // set up desktop layout
 function layout_desktop() {
+  /* hide chat pane (desktop uses toggle, not carousel) */
+  $('#chat-pane').addClass('chat-pane-hidden').hide()
+
   /* hide suggest pane by default */
   $('#suggest-pane').hide()
   $('#suggest-resizer').removeClass('resizer')
