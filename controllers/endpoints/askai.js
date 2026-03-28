@@ -83,6 +83,7 @@ router.post('/stream', async function (req, res) {
 })
 
 router.get('/conversations', async function (req, res) {
+  res.set('Cache-Control', 'no-cache, no-store')
   let user = res.locals.user
   if (!user) return res.status(401).json({ error: 'Authentication required' })
 
@@ -100,6 +101,7 @@ router.get('/conversations', async function (req, res) {
 })
 
 router.get('/conversations/:id/messages', async function (req, res) {
+  res.set('Cache-Control', 'no-cache, no-store')
   let user = res.locals.user
   if (!user) return res.status(401).json({ error: 'Authentication required' })
 
