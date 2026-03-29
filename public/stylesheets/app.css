@@ -1067,6 +1067,26 @@ body {
 .chat-course-card-wrapper {
   margin: 4px 0;
 }
+.chat-search-results {
+  margin: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  max-height: 400px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.chat-search-results .list-group-item {
+  margin: 0;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 1px solid #eee;
+}
+.chat-search-results .list-group-item:last-child {
+  border-bottom: none;
+}
 .chat-inline-course {
   border-left: 3px solid #EE7F2D;
 }

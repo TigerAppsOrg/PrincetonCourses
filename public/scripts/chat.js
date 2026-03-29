@@ -232,6 +232,7 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
 }
 
 function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
+  console.log('[chat] tryRenderCourseCard:', toolName, JSON.stringify(data).substring(0, 200))
   if (!data || !data.result || !data.result.content) return false
 
   if (toolName === 'get_course_details' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
@@ -263,6 +264,61 @@ function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
   return false
 }
 
+function renderSectionsInChat (containerId, data, toolDomId) {
+  var sections = data.sections
+  if (!sections || sections.length === 0) return false
+
+  var dayMap = { M: 'Mon', T: 'Tue', W: 'Wed', Th: 'Thu', F: 'Fri' }
+  var code = data.code || ''
+
+  var wrapper = $('<div class="chat-search-results chat-animate-in"></div>')
+  if (toolDomId) {
+    $('#' + toolDomId).replaceWith(wrapper)
+  } else {
+    $('#' + containerId + '-body').append(wrapper)
+  }
+
+  // Header row
+  wrapper.append(
+    '<li class="list-group-item" style="background:#eee;border-bottom:1px solid #ddd;padding:6px 8px;">' +
+    '<div class="flex-container-row">' +
+    '<div class="flex-item-stretch"><strong>' + escapeHtml(code) + '</strong> &mdash; Sections</div>' +
+    '<div class="flex-item-rigid"><small class="text-muted">' + sections.length + ' total</small></div>' +
+    '</div></li>'
+  )
+
+  for (var i = 0; i < sections.length; i++) {
+    var sec = sections[i]
+    var title = sec.title || ''
+    var days = (sec.days || []).map(function (d) { return dayMap[d] || d }).join(' / ')
+    var time = ''
+    if (sec.startTime && sec.endTime) time = sec.startTime + ' – ' + sec.endTime
+    var schedule = [days, time].filter(Boolean).join('  ')
+
+    var statusColor = sec.status === 'open' ? '#5cb85c' : '#d9534f'
+    var statusDot = '<span style="color:' + statusColor + ';font-size:10px;">&#9679;</span>'
+    var enrolled = ''
+    if (typeof sec.tot === 'number' && typeof sec.cap === 'number') {
+      enrolled = '<small class="text-muted">' + sec.tot + '/' + sec.cap + '</small>'
+    }
+
+    var html = '<li class="list-group-item" style="padding:5px 8px;">' +
+      '<div class="flex-container-row">' +
+      '<div class="flex-item-stretch truncate">' +
+      statusDot + ' <strong>' + escapeHtml(title) + '</strong> ' +
+      '<span class="text-muted" style="font-size:12px;">' + escapeHtml(schedule) + '</span>' +
+      '</div>' +
+      '<div class="flex-item-rigid">' + enrolled + '</div>' +
+      '</div>' +
+      (sec.room ? '<div style="font-size:11px;color:#999;padding-left:16px;">' + escapeHtml(sec.room) + '</div>' : '') +
+      '</li>'
+    wrapper.append(html)
+  }
+
+  scrollChatToBottom()
+  return true
+}
+
 function renderSearchResultsInChat (containerId, courses, toolDomId) {
   if (!courses || courses.length === 0) return false
 
@@ -274,31 +330,63 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
     $('#' + containerId + '-body').append(wrapper)
   }
 
-  // Cap at 10
-  var toRender = courses.slice(0, 10)
+  // Show all courses (scrollable container)
+  var toRender = courses
   var rendered = 0
 
   for (var i = 0; i < toRender.length; i++) {
     ;(function (course, index) {
       var pcId = null
-      if (course.listingId && course.term) {
-        pcId = course.term * 1000000 + parseInt(course.listingId, 10)
+      // Extract listingId and term from various result formats
+      var listingId = course.listingId || null
+      var termCode = course.term || null
+      if (!listingId && course.id && course.id.indexOf('-') !== -1) {
+        var idParts = course.id.split('-')
+        listingId = idParts[0]
+        termCode = parseInt(idParts[1], 10)
+      }
+      if (listingId && termCode) {
+        pcId = termCode * 1000000 + parseInt(listingId, 10)
+      } else if (listingId && !termCode) {
+        // find_top_rated_courses has no term - use current semester value
+        var semEl = document.getElementById('semester')
+        if (semEl && semEl.value) {
+          pcId = parseInt(semEl.value, 10) * 1000000 + parseInt(listingId, 10)
+        }
       }
 
-      if (pcId) {
-        $.getJSON('/api/course/' + pcId, function (fullCourse) {
-          if (fullCourse && fullCourse._id) {
-            addCard(fullCourse, pcId, index)
-          } else {
-            addSimpleCard(course, pcId, index)
-          }
-        }).fail(function () {
-          addSimpleCard(course, pcId, index)
-        })
-      } else {
-        addSimpleCard(course, null, index)
+      // Try to fetch enriched course data, with fallback across recent terms
+      var termsToTry = []
+      if (pcId) termsToTry.push(pcId)
+      // Also try many terms if we have a listingId (courses may only exist in older semesters)
+      if (listingId) {
+        var allTerms = [1272, 1264, 1262, 1254, 1252, 1244, 1242, 1234, 1232]
+        for (var t = 0; t < allTerms.length; t++) {
+          var altId = allTerms[t] * 1000000 + parseInt(listingId, 10)
+          if (altId !== pcId) termsToTry.push(altId)
+        }
       }
+      tryFetchCourse(termsToTry, 0, course, index)
     })(toRender[i], i)
+  }
+
+  function tryFetchCourse (idsToTry, idx, course, index) {
+    if (idx >= idsToTry.length) {
+      console.log('[chat] all lookups failed for', course.code, 'tried', idsToTry.length, 'ids')
+      addSimpleCard(course, idsToTry[0] || null, index)
+      return
+    }
+    $.getJSON('/api/course/' + idsToTry[idx], function (fullCourse) {
+      if (fullCourse && fullCourse._id) {
+        console.log('[chat] found course', course.code, 'at id', idsToTry[idx])
+        addCard(fullCourse, idsToTry[idx], index)
+      } else {
+        tryFetchCourse(idsToTry, idx + 1, course, index)
+      }
+    }).fail(function (jqXHR) {
+      console.log('[chat] lookup failed for', idsToTry[idx], 'status:', jqXHR.status)
+      tryFetchCourse(idsToTry, idx + 1, course, index)
+    })
   }
 
   function addCard (course, courseId, index) {
@@ -316,10 +404,12 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
     var code = course.code || ''
     var title = course.title || ''
     var status = course.status || ''
+    var rating = course.weightedAvgRating || course.rating || ''
     var statusDot = status === 'open' ? '<span style="color:#5cb85c;">&#9679;</span> ' : (status === 'closed' ? '<span style="color:#d9534f;">&#9679;</span> ' : '')
+    var ratingBadge = rating ? ' <span class="badge" style="background:#5cb85c;font-size:0.8em;">' + escapeHtml(String(parseFloat(rating).toFixed(2))) + '</span>' : ''
     var html = '<li class="list-group-item search-result chat-inline-course" style="cursor:pointer">' +
       '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
-      statusDot + '<strong>' + escapeHtml(code) + '</strong></div></div>' +
+      statusDot + '<strong>' + escapeHtml(code) + '</strong></div><div class="flex-item-rigid">' + ratingBadge + '</div></div>' +
       '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
       escapeHtml(title) + '</div></div></li>'
     var entry = $.parseHTML(html)[0]
@@ -816,6 +906,7 @@ function sendChatMessage (text) {
           // Find the matching tool_call part by name (or the last tool_call)
           var resultName = (data && data.name) || ''
           var resultCallId = (data && data.call_id) || null
+          console.log('[chat] tool_result:', resultName, 'call_id:', resultCallId, 'parts:', parts.length)
           var matchedPart = null
           for (var ti = parts.length - 1; ti >= 0; ti--) {
             if (parts[ti].type === 'tool_call') {
@@ -831,6 +922,7 @@ function sendChatMessage (text) {
               if (!matchedPart) matchedPart = parts[ti]
             }
           }
+          console.log('[chat] matchedPart:', matchedPart ? { type: matchedPart.type, toolName: matchedPart.toolName, domId: matchedPart.domId } : null)
           if (matchedPart && matchedPart.domId) {
             // Try to render a course card for get_course_details — replaces the tool card
             var renderedCard = tryRenderCourseCard(containerId, resultName, data, matchedPart.domId)
