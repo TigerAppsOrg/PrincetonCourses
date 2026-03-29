@@ -350,8 +350,8 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
     $('#' + containerId + '-body').append(wrapper)
   }
 
-  // Cap at 10
-  var toRender = courses.slice(0, 10)
+  // Show all courses (scrollable container)
+  var toRender = courses
   var rendered = 0
 
   for (var i = 0; i < toRender.length; i++) {
