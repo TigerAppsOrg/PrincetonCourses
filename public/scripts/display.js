@@ -360,10 +360,11 @@ var newDOMclassListing = function(aclass) {
     var meeting = aclass.schedule.meetings[index]
 
     var hasBuilding = (meeting.hasOwnProperty('building') &&
-                       meeting.building.hasOwnProperty('short_name'))
+                       (meeting.building.hasOwnProperty('short_name') || meeting.building.hasOwnProperty('name')))
     var hasRoom = meeting.hasOwnProperty('room')
 
-    var room = ((hasBuilding ? (meeting.building.short_name + ' ') : '')
+    var buildingName = hasBuilding ? (meeting.building.short_name || meeting.building.name) : ''
+    var room = ((hasBuilding ? (buildingName + ' ') : '')
                + (hasRoom ? meeting.room : ''))
 
     var time = ''
