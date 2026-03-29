@@ -138,11 +138,11 @@ function loadConversation (convId) {
         } catch (_) {}
       } else if (m.role === 'tool_result') {
         if (!currentContainer) currentContainer = createAssistantContainer()
-        // Try to render a course card for get_course_details results
+        // Try to render course cards for any course tool results
         try {
           var tr = JSON.parse(m.content)
-          if (tr.name === 'get_course_details' && tr.result && tr.result.content) {
-            tryRenderCourseCard(currentContainer, 'get_course_details', tr)
+          if (tr.result && tr.result.content) {
+            tryRenderCourseCard(currentContainer, tr.name, tr)
           }
         } catch (_) {}
       } else if (m.role === 'assistant') {
@@ -234,7 +234,7 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
 function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
   if (!data || !data.result || !data.result.content) return false
 
-  if (toolName === 'get_course_details') {
+  if (toolName === 'get_course_details' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
     for (var i = 0; i < data.result.content.length; i++) {
       if (data.result.content[i].text) {
         try {
@@ -247,7 +247,7 @@ function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
     }
   }
 
-  if (toolName === 'search_courses' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
+  if (toolName === 'search_courses') {
     for (var j = 0; j < data.result.content.length; j++) {
       if (data.result.content[j].text) {
         try {
