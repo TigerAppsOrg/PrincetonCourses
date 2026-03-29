@@ -282,59 +282,52 @@ function renderSectionsInChat (containerId, data, toolDomId) {
   if (!sections || sections.length === 0) return false
 
   var dayMap = { M: 'Mon', T: 'Tue', W: 'Wed', Th: 'Thu', F: 'Fri' }
-
   var code = data.code || ''
-  var html = '<div class="chat-sections-card chat-animate-in">'
-  html += '<div class="chat-sections-header">'
-  html += '<strong>' + escapeHtml(code) + '</strong> Sections'
-  html += '<span class="chat-sections-count">' + sections.length + ' section' + (sections.length !== 1 ? 's' : '') + '</span>'
-  html += '</div>'
+
+  var wrapper = $('<div class="chat-search-results chat-animate-in"></div>')
+  if (toolDomId) {
+    $('#' + toolDomId).replaceWith(wrapper)
+  } else {
+    $('#' + containerId + '-body').append(wrapper)
+  }
+
+  // Header row
+  wrapper.append(
+    '<li class="list-group-item" style="background:#eee;border-bottom:1px solid #ddd;padding:6px 8px;">' +
+    '<div class="flex-container-row">' +
+    '<div class="flex-item-stretch"><strong>' + escapeHtml(code) + '</strong> &mdash; Sections</div>' +
+    '<div class="flex-item-rigid"><small class="text-muted">' + sections.length + ' total</small></div>' +
+    '</div></li>'
+  )
 
   for (var i = 0; i < sections.length; i++) {
     var sec = sections[i]
     var title = sec.title || ''
-    var days = (sec.days || []).map(function (d) { return dayMap[d] || d }).join(', ')
+    var days = (sec.days || []).map(function (d) { return dayMap[d] || d }).join(' / ')
     var time = ''
-    if (sec.startTime && sec.endTime) {
-      time = sec.startTime + ' – ' + sec.endTime
-    }
-    var statusClass = sec.status === 'open' ? 'chat-sec-open' : 'chat-sec-closed'
-    var statusDot = sec.status === 'open' ? '&#9679;' : '&#9679;'
+    if (sec.startTime && sec.endTime) time = sec.startTime + ' – ' + sec.endTime
+    var schedule = [days, time].filter(Boolean).join('  ')
+
+    var statusColor = sec.status === 'open' ? '#5cb85c' : '#d9534f'
+    var statusDot = '<span style="color:' + statusColor + ';font-size:10px;">&#9679;</span>'
     var enrolled = ''
     if (typeof sec.tot === 'number' && typeof sec.cap === 'number') {
-      enrolled = sec.tot + '/' + sec.cap
+      enrolled = '<small class="text-muted">' + sec.tot + '/' + sec.cap + '</small>'
     }
-    var room = sec.room ? escapeHtml(sec.room) : ''
-    var isLecture = title.charAt(0) === 'L'
-    var isPrecept = title.charAt(0) === 'P'
-    var isLab = title.charAt(0) === 'B'
-    var typeLabel = isLecture ? 'Lecture' : (isPrecept ? 'Precept' : (isLab ? 'Lab' : ''))
-    var typeClass = isLecture ? 'chat-sec-type-lec' : (isPrecept ? 'chat-sec-type-pre' : 'chat-sec-type-other')
 
-    html += '<div class="chat-section-row">'
-    html += '<div class="chat-sec-left">'
-    html += '<span class="chat-sec-title ' + typeClass + '">' + escapeHtml(title) + '</span>'
-    if (typeLabel) html += '<span class="chat-sec-type">' + typeLabel + '</span>'
-    html += '</div>'
-    html += '<div class="chat-sec-middle">'
-    if (days) html += '<span class="chat-sec-days">' + escapeHtml(days) + '</span>'
-    if (time) html += '<span class="chat-sec-time">' + escapeHtml(time) + '</span>'
-    if (room) html += '<span class="chat-sec-room">' + room + '</span>'
-    html += '</div>'
-    html += '<div class="chat-sec-right">'
-    html += '<span class="' + statusClass + '">' + statusDot + '</span>'
-    if (enrolled) html += '<span class="chat-sec-enrolled">' + enrolled + '</span>'
-    html += '</div>'
-    html += '</div>'
+    var html = '<li class="list-group-item" style="padding:5px 8px;">' +
+      '<div class="flex-container-row">' +
+      '<div class="flex-item-stretch truncate">' +
+      statusDot + ' <strong>' + escapeHtml(title) + '</strong> ' +
+      '<span class="text-muted" style="font-size:12px;">' + escapeHtml(schedule) + '</span>' +
+      '</div>' +
+      '<div class="flex-item-rigid">' + enrolled + '</div>' +
+      '</div>' +
+      (sec.room ? '<div style="font-size:11px;color:#999;padding-left:16px;">' + escapeHtml(sec.room) + '</div>' : '') +
+      '</li>'
+    wrapper.append(html)
   }
 
-  html += '</div>'
-
-  if (toolDomId) {
-    $('#' + toolDomId).replaceWith(html)
-  } else {
-    $('#' + containerId + '-body').append(html)
-  }
   scrollChatToBottom()
   return true
 }
