@@ -24,7 +24,7 @@ function updateUsageBar (percent, tier) {
     fill.className = 'usage-mid'
   }
   if (pctEl) pctEl.textContent = pct + '%'
-  if (tier === 1) label.textContent = 'Sonnet 4.6'
+  if (tier === 1) label.textContent = 'Haiku 4.5'
   else if (tier === 2) label.textContent = 'Haiku 4.5'
   else if (tier === 'exhausted') label.textContent = 'Limit reached'
 }
