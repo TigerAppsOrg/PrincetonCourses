@@ -235,7 +235,7 @@ function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
   console.log('[chat] tryRenderCourseCard:', toolName, JSON.stringify(data).substring(0, 200))
   if (!data || !data.result || !data.result.content) return false
 
-  if (toolName === 'get_course_details' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
+  if (toolName === 'get_course_details') {
     for (var i = 0; i < data.result.content.length; i++) {
       if (data.result.content[i].text) {
         try {
@@ -248,7 +248,7 @@ function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
     }
   }
 
-  if (toolName === 'search_courses') {
+  if (toolName === 'search_courses' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
     for (var j = 0; j < data.result.content.length; j++) {
       if (data.result.content[j].text) {
         try {
