@@ -262,7 +262,6 @@ function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
   }
 
   if (toolName === 'search_courses' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
-  if (toolName === 'search_courses' || toolName === 'find_top_rated_courses' || toolName === 'discover_courses') {
     for (var j = 0; j < data.result.content.length; j++) {
       if (data.result.content[j].text) {
         try {
@@ -340,60 +339,6 @@ function renderSectionsInChat (containerId, data, toolDomId) {
   return true
 }
 
-function renderSectionsInChat (containerId, data, toolDomId) {
-  var sections = data.sections
-  if (!sections || sections.length === 0) return false
-
-  var dayMap = { M: 'Mon', T: 'Tue', W: 'Wed', Th: 'Thu', F: 'Fri' }
-  var code = data.code || ''
-
-  var wrapper = $('<div class="chat-search-results chat-animate-in"></div>')
-  if (toolDomId) {
-    $('#' + toolDomId).replaceWith(wrapper)
-  } else {
-    $('#' + containerId + '-body').append(wrapper)
-  }
-
-  // Header row
-  wrapper.append(
-    '<li class="list-group-item" style="background:#eee;border-bottom:1px solid #ddd;padding:6px 8px;">' +
-    '<div class="flex-container-row">' +
-    '<div class="flex-item-stretch"><strong>' + escapeHtml(code) + '</strong> &mdash; Sections</div>' +
-    '<div class="flex-item-rigid"><small class="text-muted">' + sections.length + ' total</small></div>' +
-    '</div></li>'
-  )
-
-  for (var i = 0; i < sections.length; i++) {
-    var sec = sections[i]
-    var title = sec.title || ''
-    var days = (sec.days || []).map(function (d) { return dayMap[d] || d }).join(' / ')
-    var time = ''
-    if (sec.startTime && sec.endTime) time = sec.startTime + ' – ' + sec.endTime
-    var schedule = [days, time].filter(Boolean).join('  ')
-
-    var statusColor = sec.status === 'open' ? '#5cb85c' : '#d9534f'
-    var statusDot = '<span style="color:' + statusColor + ';font-size:10px;">&#9679;</span>'
-    var enrolled = ''
-    if (typeof sec.tot === 'number' && typeof sec.cap === 'number') {
-      enrolled = '<small class="text-muted">' + sec.tot + '/' + sec.cap + '</small>'
-    }
-
-    var html = '<li class="list-group-item" style="padding:5px 8px;">' +
-      '<div class="flex-container-row">' +
-      '<div class="flex-item-stretch truncate">' +
-      statusDot + ' <strong>' + escapeHtml(title) + '</strong> ' +
-      '<span class="text-muted" style="font-size:12px;">' + escapeHtml(schedule) + '</span>' +
-      '</div>' +
-      '<div class="flex-item-rigid">' + enrolled + '</div>' +
-      '</div>' +
-      (sec.room ? '<div style="font-size:11px;color:#999;padding-left:16px;">' + escapeHtml(sec.room) + '</div>' : '') +
-      '</li>'
-    wrapper.append(html)
-  }
-
-  scrollChatToBottom()
-  return true
-}
 
 function renderSearchResultsInChat (containerId, courses, toolDomId) {
   if (!courses || courses.length === 0) return false
@@ -496,24 +441,6 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
     })(toRender[i], i)
   }
 
-  function tryFetchCourse (idsToTry, idx, course, index) {
-    if (idx >= idsToTry.length) {
-      console.log('[chat] all lookups failed for', course.code, 'tried', idsToTry.length, 'ids')
-      addSimpleCard(course, idsToTry[0] || null, index)
-      return
-    }
-    $.getJSON('/api/course/' + idsToTry[idx], function (fullCourse) {
-      if (fullCourse && fullCourse._id) {
-        console.log('[chat] found course', course.code, 'at id', idsToTry[idx])
-        addCard(fullCourse, idsToTry[idx], index)
-      } else {
-        tryFetchCourse(idsToTry, idx + 1, course, index)
-      }
-    }).fail(function (jqXHR) {
-      console.log('[chat] lookup failed for', idsToTry[idx], 'status:', jqXHR.status)
-      tryFetchCourse(idsToTry, idx + 1, course, index)
-    })
-  }
 
   function addCard (course, courseId, index) {
     var entry = newDOMcourseResult(course, { tags: 1 })
@@ -531,13 +458,10 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
     var title = course.title || ''
     var status = course.status || ''
     var rating = course.weightedAvgRating || course.rating || ''
-    var rating = course.weightedAvgRating || course.rating || ''
     var statusDot = status === 'open' ? '<span style="color:#5cb85c;">&#9679;</span> ' : (status === 'closed' ? '<span style="color:#d9534f;">&#9679;</span> ' : '')
-    var ratingBadge = rating ? ' <span class="badge" style="background:#5cb85c;font-size:0.8em;">' + escapeHtml(String(parseFloat(rating).toFixed(2))) + '</span>' : ''
     var ratingBadge = rating ? ' <span class="badge" style="background:#5cb85c;font-size:0.8em;">' + escapeHtml(String(parseFloat(rating).toFixed(2))) + '</span>' : ''
     var html = '<li class="list-group-item search-result chat-inline-course" style="cursor:pointer">' +
       '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
-      statusDot + '<strong>' + escapeHtml(code) + '</strong></div><div class="flex-item-rigid">' + ratingBadge + '</div></div>' +
       statusDot + '<strong>' + escapeHtml(code) + '</strong></div><div class="flex-item-rigid">' + ratingBadge + '</div></div>' +
       '<div class="flex-container-row"><div class="flex-item-stretch truncate">' +
       escapeHtml(title) + '</div></div></li>'
