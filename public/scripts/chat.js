@@ -141,8 +141,8 @@ function loadConversation (convId) {
         // Try to render a course card for get_course_details results
         try {
           var tr = JSON.parse(m.content)
-          if (tr.name === 'get_course_details' && tr.result && tr.result.content) {
-            tryRenderCourseCard(currentContainer, 'get_course_details', tr)
+          if (tr.result && tr.result.content) {
+            tryRenderCourseCard(currentContainer, tr.name, tr)
           }
         } catch (_) {}
       } else if (m.role === 'assistant') {
