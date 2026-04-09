@@ -464,6 +464,10 @@ function toggleChat () {
       $('#chat-pane').addClass('chat-mobile-open')
       $('#chat-pane').show()
       $('#chat-ta').focus()
+      if (window.posthog) {
+        posthog.capture('ask_ai_opened')
+        posthog.setPersonProperties({ used_ask_ai: true })
+      }
     }
     return false
   }
@@ -477,7 +481,13 @@ function toggleChat () {
   $('#chat-resizer').removeClass(isVisible ? 'resizer' : 'resizer-inactive')
   $('#chat-resizer').addClass(isVisible ? 'resizer-inactive' : 'resizer')
   if (isVisible) $('#ask-ai-btn').removeClass('active')
-  else $('#ask-ai-btn').addClass('active')
+  else {
+    $('#ask-ai-btn').addClass('active')
+    if (window.posthog) {
+      posthog.capture('ask_ai_opened')
+      posthog.setPersonProperties({ used_ask_ai: true })
+    }
+  }
   return false
 }
 
