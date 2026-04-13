@@ -11,6 +11,12 @@
     release: release
   })
   %>
+    <%- include('../partials/header.ejs') %>
+    <%- include('../partials/staticResources', {
+      scripts: ['logout', 'feedback', 'navbar', 'about'],
+      stylesheets: ['about', 'feedback', 'navbar'],
+      release: release
+    }) %>
       </head>
 
       <!-- KARA: initial body on CodePen at https://codepen.io/melyshu/pen/aJXmNo, altered since transporting code -->
@@ -253,6 +259,7 @@
 
           </div>
 
+          <%- include('../partials/feedback.ejs') %>
           <%- include('../partials/feedback.ejs') %>
 
           </html>
