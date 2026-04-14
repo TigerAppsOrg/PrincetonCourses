@@ -166,40 +166,39 @@ function loadConversation (convId) {
 
 function renderCourseCardInChat (containerId, courseData, toolDomId) {
   if (!courseData || !courseData.code) return false
-  if (toolDomId) markToolDone(toolDomId)
 
   // Compute PrincetonCourses _id: semester * 1000000 + parseInt(listingId)
-  // Engine returns listingId (e.g., "007996") and term (e.g., 1272)
   var pcId = null
   if (courseData.listingId && courseData.term) {
     pcId = courseData.term * 1000000 + parseInt(courseData.listingId, 10)
   }
 
-  // Fetch the full course object from PrincetonCourses by its _id
+  // Place wrapper synchronously so it lands in the right DOM position (same pattern as search/sections)
+  var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
+  if (toolDomId) {
+    $('#' + toolDomId).replaceWith(wrapper)
+  } else {
+    $('#' + containerId + '-body').append(wrapper)
+  }
+  scrollChatToBottom()
+
   if (pcId) {
     $.getJSON('/api/course/' + pcId, function (course) {
-      if (!course || !course._id) return
-      renderCard(course, pcId)
+      if (!course || !course._id) { renderSimpleCard(); return }
+      var entry = newDOMcourseResult(course, { tags: 1 })
+      $(entry).find('.ask-ai-icon').remove()
+      $(entry).off('click').on('click', function (e) {
+        e.stopPropagation()
+        displayCourseDetails(pcId, false)
+        return false
+      })
+      wrapper.append(entry)
+      scrollChatToBottom()
     }).fail(function () {
-      // Fallback: render a simple card without full PrincetonCourses data
       renderSimpleCard()
     })
   } else {
     renderSimpleCard()
-  }
-
-  function renderCard (course, courseId) {
-    // Build a full course object for newDOMcourseResult
-    var entry = newDOMcourseResult(course, { tags: 1 })
-    $(entry).find('.ask-ai-icon').remove()
-    // Override click to ensure correct _id
-    $(entry).off('click').on('click', function (e) {
-      e.stopPropagation()
-      displayCourseDetails(courseId, false)
-      return false
-    })
-
-    placeEntry(entry)
   }
 
   function renderSimpleCard () {
@@ -214,17 +213,7 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
     if (pcId) {
       $(entry).on('click', function () { displayCourseDetails(pcId, false); return false })
     }
-    placeEntry(entry)
-  }
-
-  function placeEntry (entry) {
-    var wrapper = $('<div class="chat-course-card-wrapper chat-animate-in"></div>')
     wrapper.append(entry)
-    if (toolDomId) {
-      $('#' + toolDomId).replaceWith(wrapper)
-    } else {
-      $('#' + containerId + '-body').append(wrapper)
-    }
     scrollChatToBottom()
   }
 
