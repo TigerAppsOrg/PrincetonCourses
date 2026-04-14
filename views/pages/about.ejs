@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <% include ../partials/header.ejs %>
+    <%- include('../partials/header.ejs') %>
       <%-
 
   // Include page-specific scripts and stylesheets with a per-deploy cache-buster
@@ -11,6 +11,12 @@
     release: release
   })
   %>
+    <%- include('../partials/header.ejs') %>
+    <%- include('../partials/staticResources', {
+      scripts: ['logout', 'feedback', 'navbar', 'about'],
+      stylesheets: ['about', 'feedback', 'navbar'],
+      release: release
+    }) %>
       </head>
 
       <!-- KARA: initial body on CodePen at https://codepen.io/melyshu/pen/aJXmNo, altered since transporting code -->
@@ -253,6 +259,7 @@
 
           </div>
 
-          <% include ../partials/feedback.ejs %>
+          <%- include('../partials/feedback.ejs') %>
+          <%- include('../partials/feedback.ejs') %>
 
           </html>

@@ -56,6 +56,12 @@ app.use('*', function (req, res, next) {
   } else {
     res.locals.renderLocals.release = 'v0'
   }
+  if (process.env.POSTHOG_API_KEY) {
+    res.locals.renderLocals.posthogApiKey = process.env.POSTHOG_API_KEY
+  }
+  if (process.env.POSTHOG_HOST) {
+    res.locals.renderLocals.posthogHost = process.env.POSTHOG_HOST
+  }
   next()
 })
 

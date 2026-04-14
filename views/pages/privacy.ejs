@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <% include ../partials/header.ejs %>
+  <%- include('../partials/header.ejs') %>
   <%-
 
   // Include page-specific scripts and stylesheets with a per-deploy cache-buster
@@ -9,8 +9,7 @@
     scripts: ['logout', 'feedback', 'navbar', 'about'],
     stylesheets: ['about', 'feedback', 'navbar'],
     release: release
-  })
-  %>
+  }) %>
 </head>
 
 <body>
@@ -38,6 +37,6 @@
 
   </div>
 
-  <% include ../partials/feedback.ejs %>
+  <%- include('../partials/feedback.ejs') %>
 
 </html>
