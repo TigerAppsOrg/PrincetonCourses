@@ -10,7 +10,19 @@ var chatState = {
 
 // --- Quota & Usage Bar ---
 
-function updateUsageBar (percent, tier) {
+function formatModelName (model) {
+  if (!model) return ''
+  // Strip provider prefix (e.g. "anthropic/claude-sonnet-4.6" -> "claude-sonnet-4.6")
+  var slug = String(model).split('/').pop()
+  // "claude-sonnet-4.6" -> ["claude", "sonnet", "4.6"]
+  var parts = slug.split('-')
+  return parts.map(function (p) {
+    if (/^\d/.test(p)) return p // keep version tokens as-is
+    return p.charAt(0).toUpperCase() + p.slice(1)
+  }).join(' ')
+}
+
+function updateUsageBar (percent, tier, model) {
   var fill = document.getElementById('chat-usage-fill')
   var label = document.getElementById('chat-usage-label')
   var pctEl = document.getElementById('chat-usage-pct')
@@ -24,9 +36,10 @@ function updateUsageBar (percent, tier) {
     fill.className = 'usage-mid'
   }
   if (pctEl) pctEl.textContent = pct + '%'
-  if (tier === 1) label.textContent = 'Haiku 4.5'
-  else if (tier === 2) label.textContent = 'Haiku 4.5'
-  else if (tier === 'exhausted') label.textContent = 'Limit reached'
+  if (tier === 'exhausted') label.textContent = 'Limit reached'
+  else if (model) label.textContent = formatModelName(model)
+  else if (tier === 1) label.textContent = 'Claude Sonnet 4.6'
+  else if (tier === 2) label.textContent = 'Claude Haiku 4.5'
 }
 
 function showQuotaMessage (msg) {
@@ -50,7 +63,7 @@ function fetchQuotaStatus () {
     return res.json()
   }).then(function (data) {
     if (data) {
-      updateUsageBar(data.percentUsed, data.tier)
+      updateUsageBar(data.percentUsed, data.tier, data.model)
     }
   }).catch(function () {})
 }
@@ -999,7 +1012,7 @@ function sendChatMessage (text) {
           if (data && data.conversationId) chatState.conversationId = data.conversationId
           // Update quota bar
           if (data && data.quota) {
-            updateUsageBar(data.quota.percentUsed, data.quota.tier)
+            updateUsageBar(data.quota.percentUsed, data.quota.tier, data.quota.model)
             if (data.quota.tierChanged && data.quota.tier === 2) {
               showQuotaMessage('Switched to a lighter model to conserve usage.')
             } else if (data.quota.tierChanged && data.quota.tier === 'exhausted') {
