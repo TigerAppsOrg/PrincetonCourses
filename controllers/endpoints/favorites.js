@@ -207,7 +207,7 @@ router.route('/:id/vote').all(async function (req, res, next) {
     }
 
     // Ensure the user has already voted on this comment
-    if (typeof (evaluation.voters) !== 'object' && evaluation.voters.indexOf(user._id) === -1) {
+    if (!Array.isArray(evaluation.voters) || evaluation.voters.indexOf(user._id) === -1) {
       res.sendStatus(403)
       return
     }
