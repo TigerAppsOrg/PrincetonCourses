@@ -29,23 +29,25 @@ router.route('/:id/vote').all(async function (req, res, next) {
   let user = res.locals.user
 
   try {
-    var evaluation = await evaluationModel.findById(req.params.id).exec()
-
-    // Ensure the user has not already voted on this comment
-    if (typeof (evaluation.voters) !== 'undefined' && evaluation.voters.indexOf(user._id) > -1) {
-      res.sendStatus(403)
-      return
-    }
-
-    // Update the evaluation (increment the number of votes and add the user's netID to the list of voters)
-    await evaluationModel.findByIdAndUpdate(req.params.id, {
+    // Update only if this user has not already voted on this comment
+    var evaluation = await evaluationModel.findOneAndUpdate({
+      _id: req.params.id,
+      voters: {
+        $ne: user._id
+      }
+    }, {
       $inc: {
         votes: 1
       },
       $addToSet: {
         voters: user._id
       }
-    })
+    }).exec()
+
+    if (evaluation === null) {
+      res.sendStatus(403)
+      return
+    }
 
     // Return success to the client
     res.sendStatus(200)
@@ -57,28 +59,23 @@ router.route('/:id/vote').all(async function (req, res, next) {
   let user = res.locals.user
 
   try {
-    var evaluation = await evaluationModel.findById(req.params.id).exec()
-
-    if (typeof (evaluation.voters) === 'undefined') {
-      res.sendStatus(500)
-      return
-    }
-
-    // Ensure the user has already voted on this comment
-    if (typeof (evaluation.voters) !== 'object' && evaluation.voters.indexOf(user._id) === -1) {
-      res.sendStatus(403)
-      return
-    }
-
-    // Update the evaluation (decrement the number of votes and remove the user's netID from the list of voters)
-    await evaluationModel.findByIdAndUpdate(req.params.id, {
+    // Update only if this user has already voted on this comment
+    var evaluation = await evaluationModel.findOneAndUpdate({
+      _id: req.params.id,
+      voters: user._id
+    }, {
       $inc: {
         votes: -1
       },
       $pull: {
         voters: user._id
       }
-    })
+    }).exec()
+
+    if (evaluation === null) {
+      res.sendStatus(403)
+      return
+    }
 
     // Return success to the client
     res.sendStatus(200)
