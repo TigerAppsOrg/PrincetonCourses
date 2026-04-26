@@ -17,8 +17,13 @@ module.exports.host = host
 var port = process.env.PORT || 5050
 module.exports.port = port
 
-// The secret used to encrypt session database
-module.exports.sessionSecret = process.env.SESSION_SECRET || 'abcdefghijklmnop'
+// The secret used to sign session cookies
+var sessionSecret = process.env.SESSION_SECRET
+if (typeof (sessionSecret) !== 'string' || sessionSecret.length < 32) {
+  console.log("A SESSION_SECRET of at least 32 characters is required to sign session cookies.")
+  process.exit(1)
+}
+module.exports.sessionSecret = sessionSecret
 
 // Chatbot API key
 module.exports.chatbotAPIKey = process.env.CHATBOT_API_KEY
