@@ -175,7 +175,9 @@ router.use('/:id', function (req, res) {
       // Insert the number of users who have favorited this course into the returned course object
     queryCourse.favoritesCount = favoritesCount
 
-    res.set('Cache-Control', 'public, max-age=14400').json(queryCourse)
+    res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate')
+      .set('Vary', 'Cookie, Authorization')
+      .json(queryCourse)
   }).catch(function (err) {
     console.log(err)
     res.sendStatus(500)
