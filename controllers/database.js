@@ -15,6 +15,6 @@ mongoose.connect(config.mongoDBURI)
     console.log('Connecting to the database succeeded.')
   })
   .catch(function (error) {
-    console.log('Connecting to the database failed. Databse URI: %s, Error: %s.', config.mongoDBURI, error)
+    console.log('Connecting to the database failed. Error: %s.', error)
     process.exit(1)
   })
