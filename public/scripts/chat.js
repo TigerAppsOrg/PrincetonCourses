@@ -26,16 +26,18 @@ function updateUsageBar (percent, tier, model) {
   var fill = document.getElementById('chat-usage-fill')
   var label = document.getElementById('chat-usage-label')
   var pctEl = document.getElementById('chat-usage-pct')
+  var meter = document.getElementById('chat-usage-bar')
   if (!fill || !label) return
   var pct = Math.min(100, Math.max(0, Math.round(percent)))
-  fill.style.width = pct + '%'
+  fill.style.transform = 'scaleX(' + (pct / 100) + ')'
   fill.className = ''
   if (pct >= 90 || tier === 'exhausted') {
     fill.className = 'usage-high'
   } else if (pct >= 60) {
     fill.className = 'usage-mid'
   }
-  if (pctEl) pctEl.textContent = pct + '%'
+  if (pctEl) pctEl.textContent = pct + '% used'
+  if (meter) meter.setAttribute('aria-valuenow', pct)
   if (tier === 'exhausted') label.textContent = 'Limit reached'
   else if (model) label.textContent = formatModelName(model)
   else if (tier === 1) label.textContent = 'Claude Sonnet 4.6'
@@ -234,7 +236,6 @@ function renderCourseCardInChat (containerId, courseData, toolDomId) {
 }
 
 function tryRenderCourseCard (containerId, toolName, data, toolDomId) {
-  console.log('[chat] tryRenderCourseCard:', toolName, JSON.stringify(data).substring(0, 200))
   if (!data || !data.result || !data.result.content) return false
 
   if (toolName === 'get_course_details') {
@@ -387,19 +388,16 @@ function renderSearchResultsInChat (containerId, courses, toolDomId) {
 
   function tryFetchCourse (idsToTry, idx, course, index) {
     if (idx >= idsToTry.length) {
-      console.log('[chat] all lookups failed for', course.code, 'tried', idsToTry.length, 'ids')
       addSimpleCard(course, idsToTry[0] || null, index)
       return
     }
     $.getJSON('/api/course/' + idsToTry[idx], function (fullCourse) {
       if (fullCourse && fullCourse._id) {
-        console.log('[chat] found course', course.code, 'at id', idsToTry[idx])
         addCard(fullCourse, idsToTry[idx], index)
       } else {
         tryFetchCourse(idsToTry, idx + 1, course, index)
       }
-    }).fail(function (jqXHR) {
-      console.log('[chat] lookup failed for', idsToTry[idx], 'status:', jqXHR.status)
+    }).fail(function () {
       tryFetchCourse(idsToTry, idx + 1, course, index)
     })
   }
@@ -474,11 +472,21 @@ function toggleChat () {
     return false
   }
   var isVisible = $('#chat-pane').is(':visible')
+  var $chatPane = $('#chat-pane')
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  var duration = reduceMotion ? 0 : (isVisible ? 210 : 280)
+  $chatPane.stop(true, true).removeClass('chat-pane-opening chat-pane-closing')
   if (isVisible) {
-    $('#chat-pane').animate({ width: 'hide' })
+    $chatPane.addClass('chat-pane-animating chat-pane-closing')
+    $chatPane.animate({ width: 'hide' }, duration, function () {
+      $chatPane.removeClass('chat-pane-animating chat-pane-closing')
+    })
   } else {
-    $('#chat-pane').removeClass('chat-pane-hidden')
-    $('#chat-pane').animate({ width: 'show' })
+    $chatPane.removeClass('chat-pane-hidden')
+    $chatPane.addClass('chat-pane-animating chat-pane-opening')
+    $chatPane.animate({ width: 'show' }, duration, function () {
+      $chatPane.removeClass('chat-pane-animating chat-pane-opening')
+    })
   }
   $('#chat-resizer').removeClass(isVisible ? 'resizer' : 'resizer-inactive')
   $('#chat-resizer').addClass(isVisible ? 'resizer-inactive' : 'resizer')
@@ -660,8 +668,8 @@ function copyChatCode (btn) {
 
 function appendWelcomeMessage () {
   var html = '<div class="chat-welcome chat-animate-in">' +
-    '<div class="chat-welcome-title">What can I help you find?</div>' +
-    '<div class="chat-welcome-subtitle">Ask about courses, workload, ratings, prerequisites, or help finding the right classes.</div>' +
+    '<div class="chat-welcome-title">Ask about courses</div>' +
+    '<div class="chat-welcome-subtitle">Compare workload, ratings, prerequisites, and schedule fit without leaving your search.</div>' +
     '</div>'
   $('#chat-messages').append(html)
 }
@@ -785,20 +793,69 @@ function showErrorInChat (msg) {
 
 // --- Suggestion Chips ---
 
+function currentCourseName () {
+  if (!document.course) return null
+  if (document.course.commonName) return document.course.commonName
+  if (document.course.department && document.course.catalogNumber) {
+    return document.course.department + ' ' + document.course.catalogNumber
+  }
+  return null
+}
+
+function suggestionChips () {
+  var courseName = currentCourseName()
+  var chips = []
+
+  if (courseName) {
+    chips.push({
+      icon: 'fa-info-circle',
+      label: 'Explain ' + courseName,
+      hint: 'Workload, prereqs, evaluations',
+      text: 'Tell me about ' + courseName + ', including workload, prerequisites, ratings, and evaluations.'
+    })
+  } else {
+    chips.push({
+      icon: 'fa-search',
+      label: 'Explain VIS 220',
+      hint: 'Workload, prereqs, ratings',
+      text: 'Tell me about VIS 220, including workload, prerequisites, ratings, and evaluations.'
+    })
+  }
+
+  chips.push({
+    icon: 'fa-calendar',
+    label: 'Recommend from my schedule',
+    hint: 'Uses TigerJunction if available',
+    text: 'If my TigerJunction schedule is available, what courses do you recommend I take next? If not, suggest courses based on my current term and favorites.'
+  })
+
+  chips.push({
+    icon: 'fa-star-o',
+    label: 'Find ORF courses without finals',
+    hint: '400-level options',
+    text: 'What are some ORF 400 level courses with no final exam?'
+  })
+
+  return chips
+}
+
 function updateSuggestionChips () {
-  var chips = [
-    { icon: '\uD83D\uDCCB', text: 'Based on my TigerJunction schedule, what courses do you recommend I take next?' },
-    { icon: '\uD83D\uDD0D', text: 'Tell me about VIS220' },
-    { icon: '\u2B50', text: 'What are some ORF 400 level courses with no final exam?' }
-  ]
+  var chips = suggestionChips()
   var container = document.getElementById('chat-prompt-chips')
   if (!container) return
   container.innerHTML = ''
   for (var i = 0; i < chips.length; i++) {
     var btn = document.createElement('button')
+    btn.type = 'button'
     btn.className = 'chat-prompt-chip'
     btn.setAttribute('data-text', chips[i].text)
-    btn.innerHTML = chips[i].icon + ' ' + escapeHtml(chips[i].text) + ' <span style="margin-left:auto; color:#ccc;">\u2192</span>'
+    btn.setAttribute('aria-label', chips[i].text)
+    btn.innerHTML = '<span class="chat-prompt-icon"><i class="fa ' + chips[i].icon + '" aria-hidden="true"></i></span>' +
+      '<span class="chat-prompt-copy">' +
+        '<span class="chat-prompt-main">' + escapeHtml(chips[i].label) + '</span>' +
+        '<span class="chat-prompt-hint">' + escapeHtml(chips[i].hint) + '</span>' +
+      '</span>' +
+      '<span class="chat-prompt-arrow" aria-hidden="true">\u2192</span>'
     btn.onclick = (function (text) {
       return function () { sendFromChip(text) }
     })(chips[i].text)
@@ -931,7 +988,6 @@ function sendChatMessage (text) {
           // Find the matching tool_call part by name (or the last tool_call)
           var resultName = (data && data.name) || ''
           var resultCallId = (data && data.call_id) || null
-          console.log('[chat] tool_result:', resultName, 'call_id:', resultCallId, 'parts:', parts.length)
           var matchedPart = null
           for (var ti = parts.length - 1; ti >= 0; ti--) {
             if (parts[ti].type === 'tool_call') {
@@ -947,7 +1003,6 @@ function sendChatMessage (text) {
               if (!matchedPart) matchedPart = parts[ti]
             }
           }
-          console.log('[chat] matchedPart:', matchedPart ? { type: matchedPart.type, toolName: matchedPart.toolName, domId: matchedPart.domId } : null)
           if (matchedPart && matchedPart.domId) {
             // Try to render a course card for get_course_details — replaces the tool card
             var renderedCard = tryRenderCourseCard(containerId, resultName, data, matchedPart.domId)
