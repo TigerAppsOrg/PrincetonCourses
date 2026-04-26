@@ -30,8 +30,8 @@
             </span>
           </div>
         </form>
-        <button id="chat-toggle-mobile" class="navbar-toggle" onclick="toggleChat(); return false;">
-          <span class="ask-ai-sparkle-mobile">&#10024;</span>
+        <button id="chat-toggle-mobile" class="navbar-toggle" onclick="toggleChat(); return false;" aria-label="Open course assistant" title="Ask AI">
+          <i class="fa fa-comments-o" aria-hidden="true"></i>
         </button>
         <button id="menu-button" type="button" class="navbar-toggle" data-toggle="collapse" data-target="#menu-collapse"> <!-- M: flex-item-rigid -->
           <span class="icon-bar"></span>
@@ -47,7 +47,7 @@
           <li id="feedback-toggle"><a href="#">Feedback</a></li>
           <li id="netid"><a href="#"><%= netid %></a></li>
           <li id="logout" class="active" style="display:none;"><a href="/auth/logout">Logout</a></li>
-          <li id="chat-toggle"><a href="#"><span id="ask-ai-btn" class="active"><span class="ask-ai-sparkle">&#10024;</span> ASK AI</span></a></li>
+          <li id="chat-toggle"><a href="#"><span id="ask-ai-btn" class="active"><i class="fa fa-comments-o" aria-hidden="true"></i> Ask AI</span></a></li>
         </ul>
       </div>
     </nav>
@@ -249,24 +249,28 @@
       <div id="chat-resizer" class="flex-item-rigid resizer"></div>
       <div id="chat-pane" class="flex-container-col slide">
         <div id="chat-header" class="flex-item-rigid">
-          <div id="chat-quota-display">
-            <div id="chat-usage-bar">
-              <div id="chat-usage-fill" style="width: 0%"></div>
+          <div id="chat-identity">
+            <div id="chat-title">Course assistant</div>
+            <div id="chat-usage-meta">
+              <span id="chat-usage-pct">0% used</span>
+              <span aria-hidden="true">·</span>
+              <span id="chat-usage-label">Sonnet 4.6</span>
             </div>
-            <span id="chat-usage-pct">0%</span>
-            <span id="chat-usage-label">Sonnet 4.6</span>
+            <div id="chat-usage-bar" role="meter" aria-label="AI usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="chat-usage-fill"></div>
+            </div>
           </div>
           <div id="chat-header-actions">
-            <button id="chat-history-btn" title="Chat history" onclick="toggleHistoryPanel()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <button id="chat-history-btn" type="button" title="Chat history" aria-label="Chat history" onclick="toggleHistoryPanel()">
+              <i class="fa fa-clock-o" aria-hidden="true"></i>
             </button>
-            <button id="chat-new-convo" title="New conversation">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <button id="chat-new-convo" type="button" title="New conversation" aria-label="New conversation">
+              <i class="fa fa-plus" aria-hidden="true"></i>
+            </button>
+            <button id="chat-close-btn" type="button" onclick="toggleChat()" title="Close chat" aria-label="Close chat">
+              <i class="fa fa-times" aria-hidden="true"></i>
             </button>
           </div>
-          <button id="chat-close-btn" onclick="toggleChat()" title="Close chat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
         </div>
         <div id="chat-history-panel" style="display:none;">
           <div id="chat-history-list">
@@ -284,12 +288,14 @@
         </div>
         <div id="chat-text-box" class="flex-item-rigid">
           <div id="chat-input-row">
-            <textarea id="chat-ta" rows="1" oninput="autoResize(this)" placeholder="Ask about courses, workload, prereqs..."></textarea>
-            <button id="chat-send-btn" title="Send message">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <label class="sr-only" for="chat-ta">Ask the course assistant</label>
+            <span id="chat-input-help" class="sr-only">Press Enter to send. Press Shift Enter for a new line.</span>
+            <textarea id="chat-ta" rows="1" oninput="autoResize(this)" placeholder="Ask about courses, workload, prereqs..." aria-describedby="chat-input-help"></textarea>
+            <button id="chat-send-btn" type="button" title="Send message" aria-label="Send message">
+              <i class="fa fa-paper-plane" aria-hidden="true"></i>
             </button>
-            <button id="chat-stop-btn" title="Stop generating" style="display: none;">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="none"><rect x="2" y="2" width="20" height="20" rx="2"></rect></svg>
+            <button id="chat-stop-btn" type="button" title="Stop generating" aria-label="Stop generating" style="display: none;">
+              <i class="fa fa-square" aria-hidden="true"></i>
             </button>
           </div>
         </div>

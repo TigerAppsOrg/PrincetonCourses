@@ -21,6 +21,7 @@ var displayCourseDetails = function(courseId, noswipe, instructorId) {
   if (courseId === '') {
     document.courseId = undefined;
     document.course = undefined;
+    if (typeof updateSuggestionChips === 'function') updateSuggestionChips()
     layout_initial_show()
 
     displayActive() // update highlighting of active course
@@ -39,6 +40,7 @@ var displayCourseDetails = function(courseId, noswipe, instructorId) {
 
       document.courseId = courseId
       document.course = course;
+      if (typeof updateSuggestionChips === 'function') updateSuggestionChips()
 
       display_title(course);
       display_subtitle(course);
