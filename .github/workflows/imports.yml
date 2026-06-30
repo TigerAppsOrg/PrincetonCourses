@@ -88,7 +88,7 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET CHATBOT_API_KEY HOST PORT; do
+          for key in MONGODB_URI SESSION_SECRET CONSUMER_KEY CONSUMER_SECRET CHATBOT_API_KEY HOST PORT; do
             val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
             if [ -n "$val" ]; then
               echo "::add-mask::${val}"
@@ -157,7 +157,7 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          for key in MONGODB_URI CONSUMER_KEY CONSUMER_SECRET; do
+          for key in MONGODB_URI SESSION_SECRET CONSUMER_KEY CONSUMER_SECRET; do
             val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
             if [ -n "$val" ]; then
               echo "::add-mask::${val}"
@@ -194,7 +194,7 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          for key in MONGODB_URI; do
+          for key in MONGODB_URI SESSION_SECRET; do
             val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
             if [ -n "$val" ]; then
               echo "::add-mask::${val}"
@@ -276,11 +276,13 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          val=$(node -e "const o=require('./heroku_config.json'); const k='MONGODB_URI'; if (o[k]) console.log(o[k]);")
-          if [ -n "$val" ]; then
-            echo "::add-mask::${val}"
-            echo "MONGODB_URI=$val" >> $GITHUB_ENV
-          fi
+          for key in MONGODB_URI SESSION_SECRET; do
+            val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
+            if [ -n "$val" ]; then
+              echo "::add-mask::${val}"
+              echo "$key=$val" >> $GITHUB_ENV
+            fi
+          done
       - name: Run backfill
         run: |
           if [ -n "${{ inputs.term }}" ]; then
@@ -317,11 +319,13 @@ jobs:
             -H "Accept: application/vnd.heroku+json; version=3" \
             https://api.heroku.com/apps/${HEROKU_APP_NAME}/config-vars)
           echo "$cfg" > heroku_config.json
-          val=$(node -e "const o=require('./heroku_config.json'); const k='MONGODB_URI'; if (o[k]) console.log(o[k]);")
-          if [ -n "$val" ]; then
-            echo "::add-mask::${val}"
-            echo "MONGODB_URI=$val" >> $GITHUB_ENV
-          fi
+          for key in MONGODB_URI SESSION_SECRET; do
+            val=$(node -e "const o=require('./heroku_config.json'); const k='${key}'; if (o[k]) console.log(o[k]);")
+            if [ -n "$val" ]; then
+              echo "::add-mask::${val}"
+              echo "$key=$val" >> $GITHUB_ENV
+            fi
+          done
       - name: Run setNewCourseFlag
         run: node importers/setNewCourseFlag.js
 
