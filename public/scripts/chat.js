@@ -931,6 +931,69 @@ function sendChatMessage (text) {
     }
   }
 
+  // --- Typewriter smoothing ---
+  // Providers stream text in multi-word chunks (especially larger models),
+  // which renders as jumpy bursts. Incoming deltas land in part.pending and a
+  // requestAnimationFrame loop drains them a few characters per frame, so the
+  // visible output is smooth regardless of upstream chunk cadence. fullText is
+  // rebuilt from content + pending, so aborts/done never lose buffered text.
+  var typewriterActive = false
+
+  function rebuildFullText () {
+    fullText = ''
+    for (var fi = 0; fi < parts.length; fi++) {
+      if (parts[fi].type === 'text') {
+        fullText += parts[fi].content
+        if (parts[fi].pending) fullText += parts[fi].pending
+      }
+    }
+  }
+
+  function renderTextPart (part) {
+    if (!part.domId) return
+    var el = document.getElementById(part.domId)
+    if (el) el.innerHTML = renderMarkdown(part.content)
+  }
+
+  function typewriterTick () {
+    var anyPending = false
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i]
+      if (part.type !== 'text' || !part.pending) continue
+      // Base speed ~180 chars/s; drain faster as the backlog grows so the
+      // rendered text never trails the stream by more than ~0.4s.
+      var take = Math.max(3, Math.ceil(part.pending.length / 24))
+      part.content += part.pending.slice(0, take)
+      part.pending = part.pending.slice(take)
+      renderTextPart(part)
+      if (part.pending) anyPending = true
+    }
+    scrollChatToBottom()
+    if (anyPending) {
+      window.requestAnimationFrame(typewriterTick)
+    } else {
+      typewriterActive = false
+    }
+  }
+
+  function startTypewriter () {
+    if (typewriterActive) return
+    typewriterActive = true
+    window.requestAnimationFrame(typewriterTick)
+  }
+
+  function flushTypewriter () {
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i]
+      if (part.type === 'text' && part.pending) {
+        part.content += part.pending
+        part.pending = ''
+        renderTextPart(part)
+      }
+    }
+    rebuildFullText()
+  }
+
   fetch('/api/ask-ai/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1036,20 +1099,14 @@ function sendChatMessage (text) {
             finalizePreviousThinking()
           }
           var textPart = ensurePart('text')
-          textPart.content += tokenText
-          fullText = ''
-          // Rebuild fullText from all text parts
-          for (var fi = 0; fi < parts.length; fi++) {
-            if (parts[fi].type === 'text') fullText += parts[fi].content
-          }
-          if (textPart.domId) {
-            document.getElementById(textPart.domId).innerHTML = renderMarkdown(textPart.content)
-          }
-          scrollChatToBottom()
+          textPart.pending = (textPart.pending || '') + tokenText
+          rebuildFullText()
+          startTypewriter()
           break
 
         case 'error':
           var errMsg = (typeof data === 'object' && data !== null) ? (data.message || data.error || JSON.stringify(data)) : String(data)
+          flushTypewriter()
           setStreamingUI(false)
           showErrorInChat(errMsg)
           break
@@ -1097,6 +1154,7 @@ function sendChatMessage (text) {
     return pump()
   }).catch(function (err) {
     if (err.name === 'AbortError') {
+      flushTypewriter()
       if (fullText) {
         chatState.messages.push({ role: 'assistant', content: fullText })
       }
