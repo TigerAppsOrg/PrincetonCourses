@@ -40,8 +40,8 @@ function updateUsageBar (percent, tier, model) {
   if (meter) meter.setAttribute('aria-valuenow', pct)
   if (tier === 'exhausted') label.textContent = 'Limit reached'
   else if (model) label.textContent = formatModelName(model)
-  else if (tier === 1) label.textContent = 'Claude Sonnet 4.6'
-  else if (tier === 2) label.textContent = 'Claude Haiku 4.5'
+  else if (tier === 1) label.textContent = 'Claude Opus 5'
+  else if (tier === 2) label.textContent = 'Claude Sonnet 5'
 }
 
 function showQuotaMessage (msg) {
