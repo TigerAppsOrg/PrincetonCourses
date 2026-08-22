@@ -2,8 +2,8 @@ name: Seats Cron
 
 on:
   schedule:
-    # Hourly at :15 (GitHub Actions scheduling is best-effort; real delay can be 5-15 min under load).
-    - cron: "15 * * * *"
+    # Every 4 hours at :15 (GitHub Actions scheduling is best-effort; real delay can be 5-15 min under load).
+    - cron: "15 */4 * * *"
   workflow_dispatch:
     inputs:
       term:
