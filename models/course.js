@@ -240,6 +240,12 @@ courseSchema.statics.createCourse = async function (semester, department, data) 
     upsertData.website = data.website.trim()
   }
 
+  // Fields that were not resolved this run (e.g. registrar enrichment
+  // unavailable) must not clobber existing values on update.
+  Object.keys(upsertData).forEach(function (key) {
+    if (typeof upsertData[key] === 'undefined') delete upsertData[key]
+  })
+
   try {
     await this.findOneAndUpdate({
       _id: data.guid

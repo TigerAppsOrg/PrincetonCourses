@@ -47,6 +47,10 @@ const assignmentPropertyNames = Object.keys(assignmentMapping)
 
 // This is how we keep track of the token that is required for accessing api.princeton.edu
 let registrarFrontEndAPIToken
+// Set once the registrar rejects the token (401/403) so remaining courses skip enrichment.
+let registrarTokenRejected = false
+let enrichedCount = 0
+let unenrichedCount = 0
 
 // Simple throttle: allows at most `maxRequests` concurrent fetches
 const createThrottle = function (maxRequests) {
@@ -111,7 +115,10 @@ var importDataFromRegistrar = async function (data) {
     await importTerm(term)
   }
 
-  console.log('All courses successfully processed.')
+  console.log('All courses successfully processed. Registrar enrichment: %d enriched, %d saved from OIT data only.', enrichedCount, unenrichedCount)
+  if (unenrichedCount > 0 && enrichedCount === 0) {
+    console.warn('No course received registrar enrichment this run. Provide a valid REGISTRAR_FE_API_TOKEN (from a browser session on registrar.princeton.edu/course-offerings) and re-run to fill grading, reserved seats, prerequisites, and reading lists.')
+  }
 
   try {
     await mongoose.connection.close()
@@ -172,21 +179,10 @@ var decodeEscapedCharacters = function (html) {
   return cheerio.load('<div>' + cheerio.load('<div>' + html + '</div>').text() + '</div>').text()
 }
 
-var importCourse = async function (semester, subjectCode, courseData) {
-  if (typeof (courseData.catalog_number) === 'undefined' || courseData.catalog_number.length < 2) {
-    return
-  }
-
-  // Decode escaped HTML characters in the course title
-  if (typeof (courseData.title) !== 'undefined') {
-    courseData.title = decodeEscapedCharacters(courseData.title)
-  }
-
-  // Decode escaped HTML characters in the course description
-  if (typeof (courseData.detail.description) !== 'undefined') {
-    courseData.detail.description = decodeEscapedCharacters(courseData.detail.description)
-  }
-
+// Enrich courseData in place with registrar front-end API details.
+// Returns true when enrichment succeeded, false otherwise (the caller still
+// saves the course from OIT data either way).
+var enrichCourseFromRegistrar = async function (semester, courseData) {
   const requestUrl = `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`
   const requestHeaders = {
     Pragma: 'no-cache',
@@ -198,16 +194,23 @@ var importCourse = async function (semester, subjectCode, courseData) {
   try {
     var response = await throttledFetch(requestUrl, { headers: requestHeaders })
   } catch (error) {
-    console.log(error)
-    return
+    console.warn(`Registrar details request failed for ${courseData.course_id}: ${error.message}`)
+    return false
   }
 
   console.log(`Got results for ${courseData.course_id}`)
 
   // Ensure valid response shape from registrar API
+  if (response && (response.status === 401 || response.status === 403)) {
+    if (!registrarTokenRejected) {
+      console.warn(`Registrar rejected the front-end API token (HTTP ${response.status}); skipping registrar enrichment for the remaining courses.`)
+    }
+    registrarTokenRejected = true
+    return false
+  }
   if (!response || response.status !== 200) {
     console.warn(`Skipping ${courseData.course_id}: registrar responded with status ${response && response.status}`)
-    return
+    return false
   }
 
   let parsed
@@ -215,14 +218,14 @@ var importCourse = async function (semester, subjectCode, courseData) {
     parsed = await response.json()
   } catch (e) {
     console.warn(`Skipping ${courseData.course_id}: failed to parse registrar JSON (${e.message})`)
-    return
+    return false
   }
 
   const detailsRoot = parsed && parsed.course_details
   const detailsArr = detailsRoot && detailsRoot.course_detail
   if (!Array.isArray(detailsArr) || detailsArr.length === 0) {
     console.warn(`Skipping ${courseData.course_id}: no course_detail found in registrar response`)
-    return
+    return false
   }
 
   let frontEndApiCourseDetails = detailsArr[0]
@@ -313,6 +316,38 @@ var importCourse = async function (semester, subjectCode, courseData) {
 
   // Get distribution requirements
   courseData.distribution_area = frontEndApiCourseDetails.distribution_area_short
+  return true
+}
+
+var importCourse = async function (semester, subjectCode, courseData) {
+  if (typeof (courseData.catalog_number) === 'undefined' || courseData.catalog_number.length < 2) {
+    return
+  }
+
+  // Decode escaped HTML characters in the course title
+  if (typeof (courseData.title) !== 'undefined') {
+    courseData.title = decodeEscapedCharacters(courseData.title)
+  }
+
+  // Decode escaped HTML characters in the course description
+  if (typeof (courseData.detail.description) !== 'undefined') {
+    courseData.detail.description = decodeEscapedCharacters(courseData.detail.description)
+  }
+
+  if (registrarFrontEndAPIToken && !registrarTokenRejected) {
+    try {
+      if (await enrichCourseFromRegistrar(semester, courseData)) {
+        enrichedCount++
+      } else {
+        unenrichedCount++
+      }
+    } catch (error) {
+      console.warn(`Registrar enrichment threw for ${courseData.course_id}: ${error.message}`)
+      unenrichedCount++
+    }
+  } else {
+    unenrichedCount++
+  }
 
   await courseModel.createCourse(semester, subjectCode, courseData)
 }
@@ -383,7 +418,7 @@ getRegistrarFrontEndAPIToken().then(function (apiToken) {
   // Only start loading courses after token is available to avoid undefined header usage
   loadCoursesFromRegistrar(queryString, importDataFromRegistrar)
 }).catch(function (error) {
-  console.log('Failed getting registrarFrontEndAPIToken')
-  console.log(error)
-  process.exit(1)
+  console.warn('Could not acquire registrarFrontEndAPIToken (%s). Courses will be imported from OIT data without registrar enrichment (grading, reserved seats, prerequisites, reading list). Set REGISTRAR_FE_API_TOKEN to restore enrichment.', error.message)
+  registrarFrontEndAPIToken = null
+  loadCoursesFromRegistrar(queryString, importDataFromRegistrar)
 })
