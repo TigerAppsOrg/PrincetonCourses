@@ -90,6 +90,9 @@ router.use('/:query', function (req, res) {
       courseQuery['track'] = 'UGRD'
     } else if (thisQueryWord === 'GRAD') {
       courseQuery['track'] = 'GRAD'
+    } else if (thisQueryWord === 'OTF') {
+      // Mark pseudo-filter to be applied after fetching.
+      courseQuery.OTF = true
     } else if ((matches = catalogNumberLevel.exec(thisQueryWord)) !== null) {
       catalogNumberQueriedLevels.push(parseInt(matches[0].charAt(0)) * 100)
     } else if ((matches = courseDeptNumberRegexp.exec(thisQueryWord)) !== null) {
@@ -241,6 +244,10 @@ router.use('/:query', function (req, res) {
   }
 
   // Construct the courseModel database query as a promise
+  const dbCourseQuery = Object.assign({}, courseQuery)
+  if (dbCourseQuery.OTF) delete dbCourseQuery.OTF
+  promises.push(courseModel.find(dbCourseQuery, courseProjection).exec())
+  
   const COURSE_LIMIT = parseInt(process.env.SEARCH_COURSE_LIMIT || '150', 10)
   const courseFindQuery = courseModel
     .find(courseQuery, courseProjection)
@@ -283,6 +290,12 @@ router.use('/:query', function (req, res) {
     }
     if (typeof (instructors) === 'undefined' || instructors.length === 0) {
       instructors = []
+    }
+
+    // Post-fetch pseudo filters
+    if (courseQuery.OTF) {
+      const froshBlockRegex = /NOT\s+OPEN\s+TO\s+FIRST\s+YEAR\s+UNDERGRADUATES/i
+      courses = courses.filter(c => !c.otherrequirements || !froshBlockRegex.test(c.otherrequirements))
     }
 
     // Filter returned courses to include only the courses that include all of the query terms
