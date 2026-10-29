@@ -14,6 +14,8 @@ function formatModelName (model) {
   if (!model) return ''
   // Strip provider prefix (e.g. "anthropic/claude-sonnet-4.6" -> "claude-sonnet-4.6")
   var slug = String(model).split('/').pop()
+  // Native Claude IDs use hyphens in versions and may end in a snapshot date.
+  slug = slug.replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, '-$1.$2')
   // "claude-sonnet-4.6" -> ["claude", "sonnet", "4.6"]
   var parts = slug.split('-')
   return parts.map(function (p) {
@@ -40,8 +42,8 @@ function updateUsageBar (percent, tier, model) {
   if (meter) meter.setAttribute('aria-valuenow', pct)
   if (tier === 'exhausted') label.textContent = 'Limit reached'
   else if (model) label.textContent = formatModelName(model)
-  else if (tier === 1) label.textContent = 'Claude Opus 5'
-  else if (tier === 2) label.textContent = 'Claude Sonnet 5'
+  else if (tier === 1) label.textContent = 'Standard tier'
+  else if (tier === 2) label.textContent = 'Reduced-cost tier'
 }
 
 function showQuotaMessage (msg) {
