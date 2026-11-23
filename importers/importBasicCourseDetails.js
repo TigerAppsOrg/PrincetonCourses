@@ -50,6 +50,11 @@ let registrarFrontEndAPIToken
 // Set once the registrar rejects the token (401/403) so remaining courses skip enrichment.
 let registrarTokenRejected = false
 let enrichedCount = 0
+// Shared in-flight token refresh, so concurrent 401s trigger only one re-scrape
+let tokenRefreshPromise = null
+let tokenRefreshCount = 0
+const MAX_TOKEN_REFRESHES = 5
+const MAX_TRANSIENT_RETRIES = 3
 let unenrichedCount = 0
 
 // Simple throttle: allows at most `maxRequests` concurrent fetches
@@ -116,6 +121,9 @@ var importDataFromRegistrar = async function (data) {
   }
 
   console.log('All courses successfully processed. Registrar enrichment: %d enriched, %d saved from OIT data only.', enrichedCount, unenrichedCount)
+  if (unenrichedCount > 0 && enrichedCount > 0) {
+    console.warn('%d courses were saved without registrar enrichment, so their PDF status, distribution area and grading may be missing. Check the warnings above.', unenrichedCount)
+  }
   if (unenrichedCount > 0 && enrichedCount === 0) {
     console.warn('No course received registrar enrichment this run. Provide a valid REGISTRAR_FE_API_TOKEN (from a browser session on registrar.princeton.edu/course-offerings) and re-run to fill grading, reserved seats, prerequisites, and reading lists.')
   }
@@ -179,20 +187,80 @@ var decodeEscapedCharacters = function (html) {
   return cheerio.load('<div>' + cheerio.load('<div>' + html + '</div>').text() + '</div>').text()
 }
 
+const sleep = function (ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms) })
+}
+
+// Re-scrape the registrar token after a 401/403. Concurrent callers share one refresh.
+// Returns true if a different token is now available.
+const refreshRegistrarToken = function (rejectedToken) {
+  if (registrarFrontEndAPIToken !== rejectedToken) return Promise.resolve(true) // someone already refreshed
+  if (tokenRefreshPromise) return tokenRefreshPromise
+  if (tokenRefreshCount >= MAX_TOKEN_REFRESHES) return Promise.resolve(false)
+  tokenRefreshCount++
+  tokenRefreshPromise = getRegistrarFrontEndAPIToken(true).then(function (token) {
+    if (token && token !== rejectedToken) {
+      console.log('Refreshed registrar front-end API token (refresh %d).', tokenRefreshCount)
+      registrarFrontEndAPIToken = token
+      return true
+    }
+    return false
+  }).catch(function (error) {
+    console.warn('Could not refresh registrar front-end API token: %s', error.message)
+    return false
+  }).finally(function () {
+    tokenRefreshPromise = null
+  })
+  return tokenRefreshPromise
+}
+
+// Fetch a registrar URL, refreshing the token on 401/403 and backing off on 429/5xx/network errors.
+// Previously one expired token mid-run silently skipped enrichment (pdf, distribution, grading...)
+// for every remaining course.
+const fetchRegistrarWithRetries = async function (url) {
+  let transientAttempts = 0
+  while (true) {
+    const tokenUsed = registrarFrontEndAPIToken
+    let response
+    try {
+      response = await throttledFetch(url, {
+        headers: {
+          Pragma: 'no-cache',
+          Accept: 'application/json',
+          Authorization: `Bearer ${tokenUsed}`,
+          'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
+        }
+      })
+    } catch (error) {
+      if (transientAttempts++ < MAX_TRANSIENT_RETRIES) {
+        await sleep(1000 * Math.pow(2, transientAttempts))
+        continue
+      }
+      throw error
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      if (await refreshRegistrarToken(tokenUsed)) continue
+      return response
+    }
+    if ((response.status === 429 || response.status >= 500) && transientAttempts++ < MAX_TRANSIENT_RETRIES) {
+      const retryAfter = parseInt(response.headers.get('retry-after'), 10)
+      await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : 1000 * Math.pow(2, transientAttempts))
+      continue
+    }
+    return response
+  }
+}
+
 // Enrich courseData in place with registrar front-end API details.
 // Returns true when enrichment succeeded, false otherwise (the caller still
 // saves the course from OIT data either way).
 var enrichCourseFromRegistrar = async function (semester, courseData) {
   const requestUrl = `https://api.princeton.edu/registrar/course-offerings/course-details?term=${semester._id}&course_id=${courseData.course_id}`
-  const requestHeaders = {
-    Pragma: 'no-cache',
-    Accept: 'application/json',
-    Authorization: `Bearer ${registrarFrontEndAPIToken}`,
-    'User-Agent': 'Princeton Courses (https://www.princetoncourses.com)'
-  }
 
+  let response
   try {
-    var response = await throttledFetch(requestUrl, { headers: requestHeaders })
+    response = await fetchRegistrarWithRetries(requestUrl)
   } catch (error) {
     console.warn(`Registrar details request failed for ${courseData.course_id}: ${error.message}`)
     return false
@@ -203,7 +271,7 @@ var enrichCourseFromRegistrar = async function (semester, courseData) {
   // Ensure valid response shape from registrar API
   if (response && (response.status === 401 || response.status === 403)) {
     if (!registrarTokenRejected) {
-      console.warn(`Registrar rejected the front-end API token (HTTP ${response.status}); skipping registrar enrichment for the remaining courses.`)
+      console.warn(`Registrar rejected the front-end API token (HTTP ${response.status}) and it could not be refreshed; skipping registrar enrichment for the remaining courses.`)
     }
     registrarTokenRejected = true
     return false
@@ -371,8 +439,9 @@ if (process.argv.length > 2) {
   queryString = process.argv[2]
 }
 
-const getRegistrarFrontEndAPIToken = async function () {
-  if (process.env.REGISTRAR_FE_API_TOKEN && process.env.REGISTRAR_FE_API_TOKEN.trim().length > 0) {
+// Pass forceScrape=true to ignore REGISTRAR_FE_API_TOKEN (e.g. after it has expired).
+const getRegistrarFrontEndAPIToken = async function (forceScrape) {
+  if (!forceScrape && process.env.REGISTRAR_FE_API_TOKEN && process.env.REGISTRAR_FE_API_TOKEN.trim().length > 0) {
     return process.env.REGISTRAR_FE_API_TOKEN.trim()
   }
   var response = await fetch('https://registrar.princeton.edu/course-offerings')
