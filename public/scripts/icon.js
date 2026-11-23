@@ -185,7 +185,9 @@ function newHTMLtags(course, props) {
       'text': (isTitle ? 'AUDIT' : 'A')
     }
   )
-  else tag_audit = newHTMLtag(
+  // Only show "NA" when the registrar actually said no audit; if we have no
+  // audit info at all (course never got registrar details), show nothing.
+  else if (course.audit === false) tag_audit = newHTMLtag(
     {
       'tooltip': 'Audit unavailable',
       'placement': tipPlacement,
